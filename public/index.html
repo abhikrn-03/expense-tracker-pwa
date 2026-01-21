@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#121212">
+  <meta name="description" content="Elegant expense tracking PWA with dark mode">
+
+  <title>Expense Tracker</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Apple Touch Icon -->
+  <link rel="apple-touch-icon" href="/icon-512.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+  <!-- App Container -->
+  <div id="app">
+
+    <!-- Header -->
+    <header class="app-header">
+      <h1 class="app-title">💰 Expenses</h1>
+      <div class="current-date" id="currentDate"></div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-view="home">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Home</span>
+      </button>
+      <button class="nav-btn" data-view="history">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">History</span>
+      </button>
+      <button class="nav-btn" data-view="analytics">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Analytics</span>
+      </button>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- Home View -->
+      <section id="home-view" class="view active">
+        <div class="summary-card">
+          <div class="summary-label">This Month</div>
+          <div class="summary-amount" id="monthlyTotal">₹0</div>
+          <div class="summary-sublabel" id="monthlySublabel">0 transactions</div>
+        </div>
+
+        <div class="recent-section">
+          <h2 class="section-title">Recent Transactions</h2>
+          <div id="recentList" class="transaction-list"></div>
+        </div>
+      </section>
+
+      <!-- History View -->
+      <section id="history-view" class="view">
+        <div class="filter-bar">
+          <select id="monthFilter" class="filter-select">
+            <!-- Options populated by JS -->
+          </select>
+        </div>
+        <div id="historyList" class="transaction-list"></div>
+      </section>
+
+      <!-- Analytics View -->
+      <section id="analytics-view" class="view">
+        <div class="summary-card analytics-summary">
+          <div class="summary-label">Monthly Total</div>
+          <div class="summary-amount" id="analyticsTotal">₹0</div>
+        </div>
+
+        <div class="chart-section">
+          <h2 class="section-title">Category Breakdown</h2>
+          <div id="categoryChart" class="category-chart"></div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Floating Action Button -->
+    <button class="fab" id="addExpenseBtn" aria-label="Add Expense">
+      <span class="fab-icon">+</span>
+    </button>
+
+  </div>
+
+  <!-- Modal for Adding Expense -->
+  <div id="expenseModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Add Expense</h2>
+        <button class="modal-close" id="closeModal">&times;</button>
+      </div>
+
+      <form id="expenseForm" class="expense-form">
+        <div class="form-group">
+          <label for="amount">Amount (₹)</label>
+          <input type="number" id="amount" name="amount" step="0.01" required autofocus>
+        </div>
+
+        <div class="form-group">
+          <label for="date">Date</label>
+          <input type="date" id="date" name="date" required>
+        </div>
+
+        <div class="form-group">
+          <label for="category">Category</label>
+          <div class="category-select-wrapper">
+            <select id="category" name="categoryId" required>
+              <!-- Options populated by JS -->
+            </select>
+            <button type="button" class="btn-icon" id="addCategoryBtn" aria-label="Add Category">+</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="note">Note (optional)</label>
+          <input type="text" id="note" name="note" placeholder="E.g., Lunch with team">
+        </div>
+
+        <button type="submit" class="btn-primary" id="saveExpenseBtn">Add Expense</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal for Adding Category -->
+  <div id="categoryModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">New Category</h2>
+        <button class="modal-close" id="closeCategoryModal">&times;</button>
+      </div>
+
+      <form id="categoryForm" class="expense-form">
+        <div class="form-group">
+          <label for="catName">Category Name</label>
+          <input type="text" id="catName" name="name" required placeholder="E.g., Fitness">
+        </div>
+
+        <div class="form-group">
+          <label for="catIcon">Icon (Emoji)</label>
+          <input type="text" id="catIcon" name="icon" required placeholder="E.g., 🏋️" maxlength="2">
+        </div>
+
+        <div class="form-group">
+          <label for="catColor">Color</label>
+          <input type="color" id="catColor" name="hexColor" value="#D4AF37" required style="height: 50px;">
+        </div>
+
+        <button type="submit" class="btn-primary">Create Category</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast"></div>
+
+  <!-- App Script -->
+  <script src="/app.js"></script>
+</body>
+
+</html>
