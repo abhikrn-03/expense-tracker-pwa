@@ -1,10 +1,9 @@
-const CACHE_NAME = 'expense-tracker-v1';
+const CACHE_NAME = 'expense-tracker-v3'; // Updated version to force refresh
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
-    '/style.css',
-    '/app.js',
     '/manifest.json'
+    // Removed app.js and style.css from cache to always get fresh version
 ];
 
 // Install event - cache assets
@@ -44,8 +43,8 @@ self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
 
-    // Skip API requests from cache
-    if (url.pathname.startsWith('/api/')) {
+    // Skip API requests, JavaScript files, and CSS files from cache
+    if (url.pathname.startsWith('/api/') || url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
         return event.respondWith(fetch(request));
     }
 

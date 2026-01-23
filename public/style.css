@@ -49,8 +49,8 @@
   --transition-slow: 350ms ease-in-out;
 
   /* Z-index layers */
-  --z-fab: 100;
-  --z-nav: 200;
+  --z-nav: 100;
+  --z-fab: 200;
   --z-modal: 300;
   --z-toast: 400;
 }
@@ -94,13 +94,59 @@ body {
   padding: var(--spacing-lg) var(--spacing-md);
   border-bottom: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
 }
 
 .app-title {
   font-size: var(--font-size-xl);
   font-weight: 600;
   letter-spacing: -0.5px;
-  margin-bottom: var(--spacing-xs);
+}
+
+.logout-btn {
+  background: var(--color-danger);
+  border: none;
+  color: white;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.logout-btn:hover {
+  opacity: 0.85;
+}
+
+.export-btn {
+  background: var(--color-accent-gold);
+  border: none;
+  color: var(--color-bg-primary);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  margin-right: var(--spacing-sm);
+}
+
+.export-btn:hover {
+  opacity: 0.85;
+}
+
+.username-greeting {
+  font-size: var(--font-size-sm);
+  color: var(--color-accent-gold);
+  font-weight: 500;
 }
 
 .current-date {
@@ -346,6 +392,140 @@ body {
 /* ===================================
    CATEGORY CHART (Analytics)
    =================================== */
+
+/* Yearly Overview Section */
+.yearly-overview {
+  background: var(--color-bg-elevated);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+  border: 1px solid var(--color-border);
+}
+
+.year-selector-container {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.year-label {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.year-selector {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.year-selector:hover {
+  border-color: var(--color-accent-gold);
+}
+
+.yearly-total {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-accent-gold);
+  text-align: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+.monthly-bars {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--spacing-sm);
+  align-items: flex-end;
+  height: 200px;
+  padding: var(--spacing-md) 0;
+}
+
+.month-bar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.month-bar:hover .month-bar-fill {
+  filter: brightness(1.2);
+}
+
+.month-bar-container {
+  width: 100%;
+  height: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.month-bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, var(--color-accent-gold) 0%, var(--color-accent-gold-dark) 100%);
+  border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
+  transition: all var(--transition-base);
+  min-height: 4px;
+  position: relative;
+}
+
+.month-bar-amount {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.month-bar:hover .month-bar-amount {
+  opacity: 1;
+}
+
+.month-bar-label {
+  margin-top: var(--spacing-xs);
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.month-bar-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+}
+
+.month-bar:hover .month-bar-tooltip {
+  opacity: 1;
+}
+
 .chart-section {
   margin-top: var(--spacing-xl);
 }
@@ -448,24 +628,26 @@ body {
    FLOATING ACTION BUTTON
    =================================== */
 .fab {
-  position: fixed;
-  bottom: 90px;
-  right: var(--spacing-lg);
-  width: 60px;
-  height: 60px;
-  background: linear-gradient(135deg, var(--color-accent-gold) 0%, var(--color-accent-gold-dark) 100%);
-  color: var(--color-bg-primary);
-  border: none;
-  border-radius: 50%;
-  font-size: 2rem;
-  font-weight: 300;
-  cursor: pointer;
-  box-shadow: var(--shadow-lg);
-  transition: all var(--transition-base);
-  z-index: var(--z-fab);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: fixed !important;
+  bottom: 100px !important;
+  right: var(--spacing-lg) !important;
+  width: 60px !important;
+  height: 60px !important;
+  background: linear-gradient(135deg, var(--color-accent-gold) 0%, var(--color-accent-gold-dark) 100%) !important;
+  color: var(--color-bg-primary) !important;
+  border: none !important;
+  border-radius: 50% !important;
+  font-size: 2rem !important;
+  font-weight: 300 !important;
+  cursor: pointer !important;
+  box-shadow: var(--shadow-lg) !important;
+  transition: all var(--transition-base) !important;
+  z-index: var(--z-fab) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .fab:hover {
@@ -686,6 +868,75 @@ body {
 }
 
 /* ===================================
+   AUTH MODAL STYLES
+   =================================== */
+#authModal {
+  align-items: center;
+  justify-content: center;
+}
+
+#authModal .modal-content {
+  border-radius: var(--border-radius-xl);
+  max-width: 400px;
+  animation: fadeInScale var(--transition-slow);
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.auth-tabs {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.auth-tab {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  padding: var(--spacing-md);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: var(--transition-fast);
+  flex: 1;
+}
+
+.auth-tab:hover {
+  color: var(--color-text-primary);
+}
+
+.auth-tab.active {
+  color: var(--color-accent-gold);
+  border-bottom-color: var(--color-accent-gold);
+}
+
+.auth-form {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===================================
    RESPONSIVE ADJUSTMENTS
    =================================== */
 @media (min-width: 768px) {
@@ -699,7 +950,8 @@ body {
   }
 
   .fab {
-    bottom: var(--spacing-xl);
+    bottom: 120px !important;
+    right: 40px !important;
   }
 }
 

@@ -1,0 +1,76 @@
+Changes needed for CSV export - apply manually:
+
+1. In public/index.html line 33, change:
+        <button class="logout-btn" id="logoutBtn" style="display: none;">Logout</button>
+   To:
+        <button class="export-btn" id="exportBtn" style="display: none;" title="Export to CSV">📥</button>
+        <button class="logout-btn" id="logoutBtn" style="display: none;">Logout</button>
+
+2. In public/style.css after .logout-btn:hover (around line 128), add:
+.export-btn {
+  background: var(--color-accent-gold);
+  border: none;
+  color: var(--color-bg-primary);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  margin-right: var(--spacing-sm);
+}
+
+.export-btn:hover {
+  opacity: 0.85;
+}
+
+3. In public/app.js after handleAuthError function, add:
+// Export expenses to CSV
+async function exportExpensesToCSV() {
+    try {
+        const allExpenses = await API.getExpenses();
+        
+        if (allExpenses.length === 0) {
+            UI.showToast('No expenses to export', 'error');
+            return;
+        }
+
+        const headers = ['Date', 'Amount', 'Category', 'Where', 'Note'];
+        const csvRows = [headers.join(',')];
+
+        allExpenses.forEach(expense => {
+            const row = [
+                expense.date,
+                expense.amount,
+                `"${expense.categoryName}"`,
+                `"${expense.whereSpent || ''}"`,
+                `"${(expense.note || '').replace(/"/g, '""')}"`
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        const filename = `expenses_${new Date().toISOString().split('T')[0]}.csv`;
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        UI.showToast(`Exported ${allExpenses.length} expenses`, 'success');
+    } catch (error) {
+        console.error('Export error:', error);
+        UI.showToast('Failed to export expenses', 'error');
+    }
+}
+
+4. In public/app.js in initApp() after "if (logoutBtn) logoutBtn.style.display = 'block';", add:
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) exportBtn.style.display = 'block';
+
+5. In public/app.js in initEventListeners() after logout event listener, add:
+    document.getElementById('exportBtn').addEventListener('click', exportExpensesToCSV);

@@ -4,18 +4,195 @@
 const state = {
     expenses: [],
     categories: [],
-    currentView: 'home',
+    currentView: localStorage.getItem('currentView') || 'home',
     currentMonth: new Date().getMonth() + 1,
     currentYear: new Date().getFullYear(),
-    currentExpenseId: null // Track if we are editing
+    currentExpenseId: null, // Track if we are editing
+    authToken: localStorage.getItem('authToken') || null,
+    currentUser: JSON.parse(localStorage.getItem('currentUser') || 'null')
 };
+
+// ===================================
+// AUTH FUNCTIONS
+// ===================================
+const Auth = {
+    getToken() {
+        return state.authToken;
+    },
+
+    setToken(token) {
+        state.authToken = token;
+        localStorage.setItem('authToken', token);
+    },
+
+    setUser(user) {
+        state.currentUser = user;
+        localStorage.setItem('currentUser', JSON.stringify(user));
+    },
+
+    clearAuth() {
+        state.authToken = null;
+        state.currentUser = null;
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('currentUser');
+    },
+
+    isAuthenticated() {
+        return !!state.authToken;
+    },
+
+    async login(username, password) {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Login failed');
+        }
+
+        const data = await response.json();
+        this.setToken(data.token);
+        this.setUser(data.user);
+        return data;
+    },
+
+    async register(username, password) {
+        const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Registration failed');
+        }
+
+        const data = await response.json();
+        this.setToken(data.token);
+        this.setUser(data.user);
+        return data;
+    },
+
+    logout() {
+        this.clearAuth();
+        location.reload();
+    },
+
+    async verifyToken() {
+        if (!state.authToken) {
+            return null;
+        }
+
+        try {
+            const response = await fetch('/api/auth/verify', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${state.authToken}`
+                }
+            });
+
+            if (!response.ok) {
+                // Token is invalid or expired
+                this.clearAuth();
+                return null;
+            }
+
+            const data = await response.json();
+            this.setUser(data.user);
+            return data.user;
+        } catch (error) {
+            console.error('Token verification failed:', error);
+            this.clearAuth();
+            return null;
+        }
+    }
+};
+
+// Validate user data structure
+function validateUserData(user) {
+    return user && 
+           typeof user === 'object' && 
+           user.id && 
+           user.username && 
+           typeof user.username === 'string';
+}
+
+// Handle authentication errors globally
+function handleAuthError(error) {
+    console.error('Authentication error:', error);
+    Auth.clearAuth();
+    showAuthModal();
+    const fab = document.getElementById('addExpenseBtn');
+    if (fab) fab.style.display = 'none';
+    const usernameGreeting = document.getElementById('usernameGreeting');
+    if (usernameGreeting) usernameGreeting.style.display = 'none';
+}
+
+// Export expenses to CSV
+async function exportExpensesToCSV() {
+    try {
+        const allExpenses = await API.getExpenses();
+        
+        if (allExpenses.length === 0) {
+            UI.showToast('No expenses to export', 'error');
+            return;
+        }
+
+        const headers = ['Date', 'Amount', 'Category', 'Where', 'Note'];
+        const csvRows = [headers.join(',')];
+
+        allExpenses.forEach(expense => {
+            const row = [
+                expense.date,
+                expense.amount,
+                `"${expense.categoryName}"`,
+                `"${expense.whereSpent || ''}"`,
+                `"${(expense.note || '').replace(/"/g, '""')}"`
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        const filename = `expenses_${new Date().toISOString().split('T')[0]}.csv`;
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        UI.showToast(`Exported ${allExpenses.length} expenses`, 'success');
+    } catch (error) {
+        console.error('Export error:', error);
+        UI.showToast('Failed to export expenses', 'error');
+    }
+}
 
 // ===================================
 // API FUNCTIONS
 // ===================================
 const API = {
+    getAuthHeaders() {
+        const headers = { 'Content-Type': 'application/json' };
+        const token = Auth.getToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        return headers;
+    },
+
     async getCategories() {
-        const response = await fetch('/api/categories');
+        const response = await fetch('/api/categories', {
+            headers: this.getAuthHeaders()
+        });
         if (!response.ok) throw new Error('Failed to fetch categories');
         return response.json();
     },
@@ -25,7 +202,12 @@ const API = {
         if (month) params.append('month', month);
         if (year) params.append('year', year);
 
-        const response = await fetch(`/api/expenses?${params}`);
+        const response = await fetch(`/api/expenses?${params}`, {
+            headers: this.getAuthHeaders()
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
         if (!response.ok) throw new Error('Failed to fetch expenses');
         return response.json();
     },
@@ -33,7 +215,7 @@ const API = {
     async createExpense(expenseData) {
         const response = await fetch('/api/expenses', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this.getAuthHeaders(),
             body: JSON.stringify(expenseData)
         });
         if (!response.ok) throw new Error('Failed to create expense');
@@ -43,7 +225,7 @@ const API = {
     async updateExpense(id, expenseData) {
         const response = await fetch(`/api/expenses/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this.getAuthHeaders(),
             body: JSON.stringify(expenseData)
         });
         if (!response.ok) throw new Error('Failed to update expense');
@@ -52,7 +234,8 @@ const API = {
 
     async deleteExpense(id) {
         const response = await fetch(`/api/expenses/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: this.getAuthHeaders()
         });
         if (!response.ok) throw new Error('Failed to delete expense');
         return response.json();
@@ -61,7 +244,7 @@ const API = {
     async createCategory(categoryData) {
         const response = await fetch('/api/categories', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this.getAuthHeaders(),
             body: JSON.stringify(categoryData)
         });
         if (!response.ok) throw new Error('Failed to create category');
@@ -69,8 +252,24 @@ const API = {
     },
 
     async getMonthlySummary(year, month) {
-        const response = await fetch(`/api/summary/${year}/${month}`);
+        const response = await fetch(`/api/summary/${year}/${month}`, {
+            headers: this.getAuthHeaders()
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
         if (!response.ok) throw new Error('Failed to fetch summary');
+        return response.json();
+    },
+
+    async getYearlySummary(year) {
+        const response = await fetch(`/api/summary/year/${year}`, {
+            headers: this.getAuthHeaders()
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) throw new Error('Failed to fetch yearly summary');
         return response.json();
     }
 };
@@ -129,6 +328,7 @@ const UI = {
 
     switchView(viewName) {
         state.currentView = viewName;
+        localStorage.setItem('currentView', viewName);
 
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.view === viewName);
@@ -164,6 +364,7 @@ const UI = {
             document.getElementById('amount').value = expense.amount;
             document.getElementById('date').value = expense.date;
             document.getElementById('category').value = expense.categoryId;
+            document.getElementById('where').value = expense.whereSpent || '';
             document.getElementById('note').value = expense.note || '';
         } else {
             // Add Mode
@@ -204,7 +405,7 @@ const UI = {
         ${expense.categoryIcon}
       </div>
       <div class="transaction-details">
-        <div class="transaction-category">${expense.categoryName}</div>
+        <div class="transaction-category">${expense.whereSpent || 'Unknown'}</div>
         ${expense.note ? `<div class="transaction-note">${expense.note}</div>` : ''}
         <div class="transaction-date">${UI.formatDate(expense.date)}</div>
       </div>
@@ -266,7 +467,11 @@ async function loadHomeView() {
         }
     } catch (error) {
         console.error('Error loading home view:', error);
-        UI.showToast('Failed to load data', 'error');
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast('Failed to load data', 'error');
+        }
     }
 }
 
@@ -286,12 +491,25 @@ async function loadHistoryView() {
         }
     } catch (error) {
         console.error('Error loading history view:', error);
-        UI.showToast('Failed to load history', 'error');
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast('Failed to load history', 'error');
+        }
     }
 }
 
 async function loadAnalyticsView() {
     try {
+        // Load yearly chart data
+        try {
+            await loadYearlyChart();
+        } catch (yearlyError) {
+            console.error('Error loading yearly chart:', yearlyError);
+            // Continue to load monthly breakdown even if yearly fails
+        }
+
+        // Load monthly category breakdown
         const summary = await API.getMonthlySummary(state.currentYear, state.currentMonth);
 
         document.getElementById('analyticsTotal').textContent = UI.formatCurrency(summary.total);
@@ -328,8 +546,85 @@ async function loadAnalyticsView() {
         }
     } catch (error) {
         console.error('Error loading analytics view:', error);
-        UI.showToast('Failed to load analytics', 'error');
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast('Failed to load analytics', 'error');
+        }
     }
+}
+
+async function loadYearlyChart() {
+    try {
+        const yearSelector = document.getElementById('yearSelector');
+        
+        // Populate year selector if empty
+        if (yearSelector.options.length === 0) {
+            const currentYear = new Date().getFullYear();
+            for (let year = currentYear; year >= currentYear - 5; year--) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelector.appendChild(option);
+            }
+            yearSelector.value = state.currentYear;
+        }
+
+        // Always fetch fresh data
+        const selectedYear = parseInt(yearSelector.value);
+        console.log('Fetching yearly summary for year:', selectedYear);
+        const yearlySummary = await API.getYearlySummary(selectedYear);
+        console.log('Yearly summary received:', yearlySummary);
+        
+        renderYearlyChart(yearlySummary);
+    } catch (error) {
+        console.error('Error in loadYearlyChart:', error);
+        throw error;
+    }
+}
+
+function renderYearlyChart(data) {
+    const yearlyTotalEl = document.getElementById('yearlyTotal');
+    const monthlyBarsEl = document.getElementById('monthlyBars');
+    
+    yearlyTotalEl.textContent = UI.formatCurrency(data.total);
+    monthlyBarsEl.innerHTML = '';
+    
+    // Find max amount for scaling
+    const maxAmount = Math.max(...data.months.map(m => m.total), 1);
+    
+    data.months.forEach(monthData => {
+        const heightPercent = maxAmount > 0 ? (monthData.total / maxAmount * 100) : 0;
+        
+        const barEl = document.createElement('div');
+        barEl.className = 'month-bar';
+        barEl.dataset.month = monthData.month;
+        barEl.dataset.year = data.year;
+        
+        barEl.innerHTML = `
+            <div class="month-bar-container">
+                <div class="month-bar-fill" style="height: ${heightPercent}%;">
+                    <div class="month-bar-amount">${monthData.total > 0 ? UI.formatCurrency(monthData.total) : '₹0'}</div>
+                </div>
+            </div>
+            <div class="month-bar-label">${monthData.monthName}</div>
+            <div class="month-bar-tooltip">
+                ${UI.formatCurrency(monthData.total)}<br>
+                ${monthData.count} transaction${monthData.count !== 1 ? 's' : ''}
+            </div>
+        `;
+        
+        // Click handler to filter by month
+        barEl.addEventListener('click', () => {
+            state.currentMonth = monthData.month;
+            state.currentYear = data.year;
+            UI.switchView('home');
+            populateMonthFilter();
+            loadHomeView();
+        });
+        
+        monthlyBarsEl.appendChild(barEl);
+    });
 }
 
 // ===================================
@@ -343,6 +638,7 @@ async function handleSaveExpense(event) {
         amount: parseFloat(formData.get('amount')),
         date: formData.get('date'),
         categoryId: parseInt(formData.get('categoryId')),
+        whereSpent: formData.get('whereSpent'),
         note: formData.get('note') || ''
     };
 
@@ -386,6 +682,110 @@ async function handleSaveCategory(event) {
     } catch (error) {
         console.error('Error creating category:', error);
         UI.showToast('Failed to create category', 'error');
+    }
+}
+
+// ===================================
+// AUTH HANDLERS
+// ===================================
+function showAuthModal() {
+    const modal = document.getElementById('authModal');
+    const app = document.getElementById('app');
+    const fab = document.getElementById('addExpenseBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const usernameGreeting = document.getElementById('usernameGreeting');
+    
+    modal.style.display = 'flex';
+    app.style.display = 'none';
+    if (fab) {
+        fab.style.display = 'none';
+        fab.style.visibility = 'hidden';
+    }
+    if (logoutBtn) logoutBtn.style.display = 'none';
+    if (usernameGreeting) usernameGreeting.style.display = 'none';
+}
+
+function hideAuthModal() {
+    const modal = document.getElementById('authModal');
+    modal.style.display = 'none';
+    // Note: app.style.display will be set by initApp() after data loads
+}
+
+function switchAuthTab(tab) {
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const title = document.getElementById('authModalTitle');
+    const tabs = document.querySelectorAll('.auth-tab');
+
+    tabs.forEach(t => t.classList.remove('active'));
+    document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+
+    if (tab === 'login') {
+        title.textContent = 'Welcome Back';
+        loginForm.style.display = 'block';
+        registerForm.style.display = 'none';
+    } else {
+        title.textContent = 'Create Account';
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+    }
+}
+
+async function handleLogin(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const username = formData.get('username');
+    const password = formData.get('password');
+
+    try {
+        console.log('Login attempt for:', username);
+        await Auth.login(username, password);
+        console.log('Login successful, hiding auth modal');
+        hideAuthModal();
+        console.log('Auth modal hidden, showing toast');
+        UI.showToast(`Welcome back, ${username}!`, 'success');
+        console.log('About to call initApp');
+        await initApp();
+        console.log('initApp completed');
+    } catch (error) {
+        console.error('Login error:', error);
+        UI.showToast(error.message, 'error');
+    }
+}
+
+async function handleRegister(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const username = formData.get('username');
+    const password = formData.get('password');
+    const passwordConfirm = formData.get('passwordConfirm');
+
+    if (password !== passwordConfirm) {
+        UI.showToast('Passwords do not match', 'error');
+        return;
+    }
+
+    try {
+        await Auth.register(username, password);
+        hideAuthModal();
+        UI.showToast(`Welcome, ${username}!`, 'success');
+        await initApp();
+    } catch (error) {
+        console.error('Registration error:', error);
+        UI.showToast(error.message, 'error');
+    }
+}
+
+function handleLogout() {
+    if (confirm('Are you sure you want to logout?')) {
+        // Hide username greeting
+        const usernameGreeting = document.getElementById('usernameGreeting');
+        if (usernameGreeting) {
+            usernameGreeting.style.display = 'none';
+        }
+        Auth.logout();
     }
 }
 
@@ -474,15 +874,114 @@ function initEventListeners() {
     document.getElementById('expenseForm').addEventListener('submit', handleSaveExpense);
     document.getElementById('categoryForm').addEventListener('submit', handleSaveCategory);
 
+    // Auth
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchAuthTab(tab.dataset.tab));
+    });
+    document.getElementById('loginForm').addEventListener('submit', handleLogin);
+    document.getElementById('registerForm').addEventListener('submit', handleRegister);
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    document.getElementById('exportBtn').addEventListener('click', exportExpensesToCSV);
+
+    // Year selector for analytics
+    document.getElementById('yearSelector').addEventListener('change', async () => {
+        await loadYearlyChart();
+    });
+
     document.getElementById('date').valueAsDate = new Date();
 }
 
+async function initApp() {
+    console.log('=== INITAPP CALLED ===');
+    // Called after successful auth verification
+    try {
+        const fab = document.getElementById('addExpenseBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const usernameGreeting = document.getElementById('usernameGreeting');
+        
+        // Validate user data before proceeding
+        if (!validateUserData(state.currentUser)) {
+            throw new Error('Invalid user data');
+        }
+        
+        // Show logout button
+        if (logoutBtn) logoutBtn.style.display = 'block';
+        
+        // Show export button
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) exportBtn.style.display = 'block';
+        
+        // Display username greeting (data already verified)
+        if (usernameGreeting) {
+            usernameGreeting.textContent = `Hi ${state.currentUser.username}!`;
+            usernameGreeting.style.display = 'block';
+            console.log('Username greeting displayed:', state.currentUser.username);
+        }
+        
+        // Show FAB
+        if (fab) {
+            fab.style.display = 'flex';
+            fab.style.visibility = 'visible';
+            fab.style.opacity = '1';
+            console.log('FAB displayed');
+        }
+        
+        // Load initial data
+        await populateCategorySelect();
+        populateMonthFilter();
+        
+        // Load the last viewed page (or home by default)
+        UI.switchView(state.currentView);
+        
+        // Show app container after everything is loaded
+        const appContainer = document.getElementById('app');
+        appContainer.style.display = 'flex';
+        console.log('App initialized successfully');
+    } catch (error) {
+        console.error('Error initializing app:', error);
+        handleAuthError(error);
+    }
+}
+
 async function init() {
+    console.log('=== INIT CALLED ===');
+    
+    // Hide app content initially
+    const appContainer = document.getElementById('app');
+    const authModal = document.getElementById('authModal');
+    appContainer.style.display = 'none';
+    authModal.style.display = 'none';
+    
     UI.updateCurrentDate();
     initEventListeners();
-    await populateCategorySelect();
-    populateMonthFilter();
-    loadHomeView();
+
+    // Verify authentication state
+    console.log('Checking authentication state...');
+    
+    if (state.authToken) {
+        // Token exists, verify it with the server
+        console.log('Token found, verifying with server...');
+        const user = await Auth.verifyToken();
+        
+        if (user && validateUserData(user)) {
+            // Valid token and user data
+            console.log('Token verified, user authenticated:', user.username);
+            try {
+                await initApp();
+            } catch (error) {
+                console.error('Error initializing app:', error);
+                handleAuthError(error);
+            }
+        } else {
+            // Invalid token or user data
+            console.log('Token verification failed, showing login');
+            showAuthModal();
+        }
+    } else {
+        // No token, show login
+        console.log('No token found, showing auth modal');
+        showAuthModal();
+    }
 
     if ('serviceWorker' in navigator) {
         try {
