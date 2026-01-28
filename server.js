@@ -8,6 +8,9 @@ import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import Expense from './models/Expense.js';
 import Category from './models/Category.js';
+import Income from './models/Income.js';
+import IncomeCategory from './models/IncomeCategory.js';
+import Account from './models/Account.js';
 import User from './models/User.js';
 import DatabaseHealth from './models/DatabaseHealth.js';
 
@@ -341,7 +344,215 @@ app.get('/api/summary/:year/:month', authenticateToken, (req, res) => {
     }
 });
 
-// Database health check endpoint
+// ===== Income Routes =====
+
+// Get all incomes
+app.get('/api/incomes', authenticateToken, (req, res) => {
+    try {
+        const filters = {};
+        const { month, year } = req.query;
+        if (month) filters.month = parseInt(month);
+        if (year) filters.year = parseInt(year);
+
+        const incomes = Income.getAll(req.user.userId, filters);
+        res.json(incomes);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Get single income
+app.get('/api/incomes/:id', authenticateToken, (req, res) => {
+    try {
+        const income = Income.getById(req.params.id, req.user.userId);
+        if (!income) {
+            return res.status(404).json({ error: 'Income not found' });
+        }
+        res.json(income);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Create new income
+app.post('/api/incomes', authenticateToken, (req, res) => {
+    try {
+        const { amount, date, categoryId, source, note } = req.body;
+
+        // Validation
+        if (!amount || !date || !categoryId || !source) {
+            return res.status(400).json({ error: 'Missing required fields: amount, date, categoryId, source' });
+        }
+
+        const income = Income.create(req.user.userId, { amount, date, categoryId, source, note });
+        res.status(201).json(income);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Update income
+app.put('/api/incomes/:id', authenticateToken, (req, res) => {
+    try {
+        const updates = req.body;
+        const income = Income.update(req.params.id, req.user.userId, updates);
+
+        if (!income) {
+            return res.status(404).json({ error: 'Income not found or no valid fields to update' });
+        }
+
+        res.json(income);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Delete income
+app.delete('/api/incomes/:id', authenticateToken, (req, res) => {
+    try {
+        const deleted = Income.delete(req.params.id, req.user.userId);
+
+        if (!deleted) {
+            return res.status(404).json({ error: 'Income not found' });
+        }
+
+        res.json({ success: true, message: 'Income deleted' });
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Get income categories
+app.get('/api/income-categories', authenticateToken, (req, res) => {
+    try {
+        const categories = IncomeCategory.getAll();
+        res.json(categories);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Create income category
+app.post('/api/income-categories', authenticateToken, (req, res) => {
+    try {
+        const { name, icon, hexColor } = req.body;
+
+        if (!name || !icon || !hexColor) {
+            return res.status(400).json({ error: 'Missing required fields: name, icon, hexColor' });
+        }
+
+        const category = IncomeCategory.create({ name, icon, hexColor });
+        res.status(201).json(category);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Get yearly income summary
+app.get('/api/income-summary/year/:year', authenticateToken, (req, res) => {
+    try {
+        const year = parseInt(req.params.year);
+        const summary = Income.getYearlySummary(req.user.userId, year);
+        res.json(summary);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Get monthly income summary
+app.get('/api/income-summary/:year/:month', authenticateToken, (req, res) => {
+    try {
+        const year = parseInt(req.params.year);
+        const month = parseInt(req.params.month);
+
+        const summary = Income.getMonthlySummary(req.user.userId, year, month);
+        res.json(summary);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// ===== Account Routes =====
+
+// Get all accounts for user
+app.get('/api/accounts', authenticateToken, (req, res) => {
+    try {
+        const accounts = Account.getAll(req.user.userId);
+        res.json(accounts);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Get account types
+app.get('/api/accounts/types', authenticateToken, (req, res) => {
+    try {
+        const types = Account.getAccountTypes();
+        res.json(types);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Get default account
+app.get('/api/accounts/default', authenticateToken, (req, res) => {
+    try {
+        const account = Account.getDefaultAccount(req.user.userId);
+        res.json(account);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Create new account
+app.post('/api/accounts', authenticateToken, (req, res) => {
+    try {
+        const { name, type, icon, hexColor, isDefault } = req.body;
+
+        if (!name || !type || !icon || !hexColor) {
+            return res.status(400).json({ error: 'Missing required fields: name, type, icon, hexColor' });
+        }
+
+        const account = Account.create(req.user.userId, { name, type, icon, hexColor, isDefault });
+        res.status(201).json(account);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Update account
+app.put('/api/accounts/:id', authenticateToken, (req, res) => {
+    try {
+        const updates = req.body;
+        const account = Account.update(req.params.id, req.user.userId, updates);
+
+        if (!account) {
+            return res.status(404).json({ error: 'Account not found or no valid fields to update' });
+        }
+
+        res.json(account);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Delete account
+app.delete('/api/accounts/:id', authenticateToken, (req, res) => {
+    try {
+        const deleted = Account.delete(req.params.id, req.user.userId);
+
+        if (!deleted) {
+            return res.status(404).json({ error: 'Account not found' });
+        }
+
+        res.json({ success: true, message: 'Account deleted' });
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// ===== Database Health Routes =====
+
 app.get('/api/health/database', authenticateToken, (req, res) => {
     try {
         const health = DatabaseHealth.checkHealth();

@@ -64,13 +64,26 @@
         </div>
 
         <div class="recent-section">
-          <h2 class="section-title">Recent Transactions</h2>
+          <div class="section-header">
+            <h2 class="section-title">
+              <span class="view-toggle-btn active" data-type="expense">Expenses</span>
+              <span class="view-toggle-separator">/</span>
+              <span class="view-toggle-btn" data-type="income">Income</span>
+            </h2>
+          </div>
           <div id="recentList" class="transaction-list"></div>
         </div>
       </section>
 
       <!-- History View -->
       <section id="history-view" class="view">
+        <div class="section-header">
+          <h2 class="section-title">
+            <span class="view-toggle-btn active" data-type="expense">Expenses</span>
+            <span class="view-toggle-separator">/</span>
+            <span class="view-toggle-btn" data-type="income">Income</span>
+          </h2>
+        </div>
         <div class="filter-bar">
           <select id="monthFilter" class="filter-select">
             <!-- Options populated by JS -->
@@ -88,6 +101,11 @@
             <select id="yearSelector" class="year-selector">
               <!-- Years populated by JS -->
             </select>
+          </div>
+          <div class="analytics-chart-toggle">
+            <button class="analytics-toggle-btn active" data-chart-type="expense">Expenses</button>
+            <button class="analytics-toggle-btn" data-chart-type="income">Income</button>
+            <button class="analytics-toggle-btn" data-chart-type="net">Net</button>
           </div>
           <div id="yearlyTotal" class="yearly-total">₹0</div>
           <div id="monthlyBars" class="monthly-bars">
@@ -146,6 +164,16 @@
         </div>
 
         <div class="form-group">
+          <label for="account">Account</label>
+          <div class="category-select-wrapper">
+            <select id="account" name="accountId" required>
+              <!-- Options populated by JS -->
+            </select>
+            <button type="button" class="btn-icon" id="addAccountBtn" aria-label="Add Account">+</button>
+          </div>
+        </div>
+
+        <div class="form-group">
           <label for="where">Where</label>
           <input type="text" id="where" name="whereSpent" placeholder="E.g., Starbucks, Amazon" required>
         </div>
@@ -160,12 +188,67 @@
     </div>
   </div>
 
+  <!-- Modal for Adding Income -->
+  <div id="incomeModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Add Income</h2>
+        <button class="modal-close" id="closeIncomeModal">&times;</button>
+      </div>
+
+      <form id="incomeForm" class="expense-form">
+        <div class="form-group">
+          <label for="incomeAmount">Amount (₹)</label>
+          <input type="number" id="incomeAmount" name="amount" step="0.01" required autofocus>
+        </div>
+
+        <div class="form-group">
+          <label for="incomeDate">Date</label>
+          <input type="date" id="incomeDate" name="date" required>
+        </div>
+
+        <div class="form-group">
+          <label for="incomeCategory">Category</label>
+          <div class="category-select-wrapper">
+            <select id="incomeCategory" name="categoryId" required>
+              <!-- Options populated by JS -->
+            </select>
+            <button type="button" class="btn-icon" id="addIncomeCategoryBtn" aria-label="Add Category">+</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="incomeAccount">Account</label>
+          <div class="category-select-wrapper">
+            <select id="incomeAccount" name="accountId" required>
+              <!-- Options populated by JS -->
+            </select>
+            <button type="button" class="btn-icon" id="addIncomeAccountBtn" aria-label="Add Account">+</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="source">Source</label>
+          <input type="text" id="source" name="source" placeholder="E.g., Salary, Client payment" required>
+        </div>
+
+        <div class="form-group">
+          <label for="incomeNote">Note (optional)</label>
+          <input type="text" id="incomeNote" name="note" placeholder="E.g., Monthly salary">
+        </div>
+
+        <button type="submit" class="btn-primary" id="saveIncomeBtn">Add Income</button>
+      </form>
+    </div>
+  </div>
+
   <!-- Modal for Adding Category -->
   <div id="categoryModal" class="modal">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
       <div class="modal-header">
-        <h2 class="modal-title">New Category</h2>
+        <h2 class="modal-title">New Expense Category</h2>
         <button class="modal-close" id="closeCategoryModal">&times;</button>
       </div>
 
@@ -183,6 +266,80 @@
         <div class="form-group">
           <label for="catColor">Color</label>
           <input type="color" id="catColor" name="hexColor" value="#D4AF37" required style="height: 50px;">
+        </div>
+
+        <button type="submit" class="btn-primary">Create Category</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal for Adding Account -->
+  <div id="accountModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">New Account</h2>
+        <button class="modal-close" id="closeAccountModal">&times;</button>
+      </div>
+
+      <form id="accountForm" class="expense-form">
+        <div class="form-group">
+          <label for="accountName">Account Name</label>
+          <input type="text" id="accountName" name="name" required placeholder="E.g., HDFC Credit Card">
+        </div>
+
+        <div class="form-group">
+          <label for="accountType">Account Type</label>
+          <select id="accountType" name="type" required>
+            <!-- Options populated by JS -->
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="accountIcon">Icon (Emoji)</label>
+          <input type="text" id="accountIcon" name="icon" required placeholder="E.g., 💳" maxlength="2">
+        </div>
+
+        <div class="form-group">
+          <label for="accountColor">Color</label>
+          <input type="color" id="accountColor" name="hexColor" value="#4CAF50" required style="height: 50px;">
+        </div>
+
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="accountDefault" name="isDefault" value="1">
+            <span>Set as default account</span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn-primary">Create Account</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal for Adding Income Category -->
+  <div id="incomeCategoryModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">New Income Category</h2>
+        <button class="modal-close" id="closeIncomeCategoryModal">&times;</button>
+      </div>
+
+      <form id="incomeCategoryForm" class="expense-form">
+        <div class="form-group">
+          <label for="incomeCatName">Category Name</label>
+          <input type="text" id="incomeCatName" name="name" required placeholder="E.g., Consulting">
+        </div>
+
+        <div class="form-group">
+          <label for="incomeCatIcon">Icon (Emoji)</label>
+          <input type="text" id="incomeCatIcon" name="icon" required placeholder="E.g., 💼" maxlength="2">
+        </div>
+
+        <div class="form-group">
+          <label for="incomeCatColor">Color</label>
+          <input type="color" id="incomeCatColor" name="hexColor" value="#4CAF50" required style="height: 50px;">
         </div>
 
         <button type="submit" class="btn-primary">Create Category</button>

@@ -280,6 +280,34 @@ body {
   color: var(--color-text-primary);
 }
 
+.section-header {
+  margin-bottom: var(--spacing-md);
+}
+
+.view-toggle-btn {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: color var(--transition-fast);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.view-toggle-btn:hover {
+  color: var(--color-text-secondary);
+}
+
+.view-toggle-btn.active {
+  color: var(--color-accent-gold);
+}
+
+.view-toggle-separator {
+  color: var(--color-text-muted);
+  margin: 0 var(--spacing-xs);
+}
+
 .recent-section {
   margin-top: var(--spacing-xl);
 }
@@ -349,11 +377,42 @@ body {
   color: var(--color-text-muted);
 }
 
+.transaction-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-xs);
+}
+
+.account-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.account-icon {
+  font-size: 0.9rem;
+}
+
+.account-name {
+  color: var(--color-text-secondary);
+}
+
 .transaction-amount {
   font-size: var(--font-size-lg);
   font-weight: 700;
   color: var(--color-accent-gold);
   white-space: nowrap;
+}
+
+.income-amount {
+  color: #4CAF50;
 }
 
 .transaction-delete {
@@ -400,6 +459,36 @@ body {
   padding: var(--spacing-lg);
   margin-bottom: var(--spacing-xl);
   border: 1px solid var(--color-border);
+}
+
+.analytics-chart-toggle {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+  justify-content: center;
+}
+
+.analytics-toggle-btn {
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.analytics-toggle-btn:hover {
+  background: var(--color-bg-elevated);
+  border-color: var(--color-accent-gold);
+}
+
+.analytics-toggle-btn.active {
+  background: var(--color-accent-gold);
+  color: var(--color-bg-primary);
+  border-color: var(--color-accent-gold);
 }
 
 .year-selector-container {
@@ -477,6 +566,18 @@ body {
   transition: all var(--transition-base);
   min-height: 4px;
   position: relative;
+}
+
+.month-bar-positive .month-bar-fill {
+  background: linear-gradient(180deg, #4CAF50 0%, #388E3C 100%);
+}
+
+.month-bar-negative .month-bar-fill {
+  background: linear-gradient(180deg, #f44336 0%, #d32f2f 100%);
+}
+
+.month-bar-income .month-bar-fill {
+  background: linear-gradient(180deg, #4CAF50 0%, #388E3C 100%);
 }
 
 .month-bar-amount {

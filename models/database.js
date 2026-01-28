@@ -146,6 +146,49 @@ const initDB = () => {
     )
   `);
 
+  // Income Categories table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS income_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      icon TEXT NOT NULL,
+      hexColor TEXT NOT NULL
+    )
+  `);
+
+  // Accounts table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS accounts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      userId INTEGER NOT NULL,
+      icon TEXT NOT NULL,
+      hexColor TEXT NOT NULL,
+      isDefault INTEGER DEFAULT 0,
+      UNIQUE(name, userId),
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Incomes table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS incomes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      amount REAL NOT NULL,
+      date TEXT NOT NULL,
+      categoryId INTEGER NOT NULL,
+      userId INTEGER NOT NULL,
+      accountId INTEGER,
+      note TEXT,
+      source TEXT NOT NULL,
+      timestamp INTEGER NOT NULL,
+      FOREIGN KEY (categoryId) REFERENCES income_categories(id) ON DELETE CASCADE,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (accountId) REFERENCES accounts(id) ON DELETE SET NULL
+    )
+  `);
+
   // Migration: Add whereSpent column if it doesn't exist
   try {
     // Migrate main database
@@ -164,6 +207,13 @@ const initDB = () => {
       // Default to user ID 1 for existing data
       db.prepare('ALTER TABLE expenses ADD COLUMN userId INTEGER NOT NULL DEFAULT 1').run();
       console.log('✅ Main database migration completed (userId)');
+    }
+
+    const hasAccountId = tableInfo.some(col => col.name === 'accountId');
+    if (!hasAccountId) {
+      console.log('📦 Migrating main database: Adding accountId column to expenses...');
+      db.prepare('ALTER TABLE expenses ADD COLUMN accountId INTEGER').run();
+      console.log('✅ Main database migration completed (accountId)');
     }
 
     // Migrate backup databases
@@ -210,8 +260,47 @@ const initDB = () => {
         }
       }
     }
+
+    // Migrate incomes table
+    const incomesTableInfo = db.prepare("PRAGMA table_info(incomes)").all();
+    const incomesHasAccountId = incomesTableInfo.some(col => col.name === 'accountId');
+    if (!incomesHasAccountId) {
+      console.log('📦 Migrating main database: Adding accountId column to incomes...');
+      db.prepare('ALTER TABLE incomes ADD COLUMN accountId INTEGER').run();
+      console.log('✅ Main database migration completed (incomes accountId)');
+    }
   } catch (error) {
     console.error('Migration error:', error);
+  }
+
+  // Initialize default accounts and link to user abhiknes
+  try {
+    const abhiknesUser = db.prepare("SELECT id FROM users WHERE username = 'abhiknes'").get();
+    if (abhiknesUser) {
+      const accountsCount = db.prepare('SELECT COUNT(*) as count FROM accounts WHERE userId = ?').get(abhiknesUser.id);
+      
+      if (accountsCount.count === 0) {
+        console.log('📦 Creating default account for abhiknes...');
+        const insertAccount = db.prepare(`
+          INSERT INTO accounts (name, type, userId, icon, hexColor, isDefault)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        const result = insertAccount.run('HDFC 1372', 'Savings Account', abhiknesUser.id, '🏦', '#004C8F', 1);
+        const defaultAccountId = result.lastInsertRowid;
+        
+        // Update all existing expenses for abhiknes to use this account
+        const updateExpenses = db.prepare('UPDATE expenses SET accountId = ? WHERE userId = ? AND accountId IS NULL');
+        const expensesUpdated = updateExpenses.run(defaultAccountId, abhiknesUser.id);
+        console.log(`✅ Updated ${expensesUpdated.changes} existing expenses with default account`);
+        
+        // Update all existing incomes for abhiknes to use this account
+        const updateIncomes = db.prepare('UPDATE incomes SET accountId = ? WHERE userId = ? AND accountId IS NULL');
+        const incomesUpdated = updateIncomes.run(defaultAccountId, abhiknesUser.id);
+        console.log(`✅ Updated ${incomesUpdated.changes} existing incomes with default account`);
+      }
+    }
+  } catch (error) {
+    console.error('Error setting up default accounts:', error);
   }
 
   // Insert default categories if table is empty
@@ -240,6 +329,32 @@ const initDB = () => {
     });
 
     insertMany(defaultCategories);
+  }
+
+  // Insert default income categories if table is empty
+  const incomeCategoryCount = db.prepare('SELECT COUNT(*) as count FROM income_categories').get();
+
+  if (incomeCategoryCount.count === 0) {
+    const insertIncomeCategory = db.prepare(
+      'INSERT INTO income_categories (name, icon, hexColor) VALUES (?, ?, ?)'
+    );
+
+    const defaultIncomeCategories = [
+      { name: 'Salary', icon: '💼', hexColor: '#4CAF50' },
+      { name: 'Freelance', icon: '💻', hexColor: '#8BC34A' },
+      { name: 'Investment', icon: '📈', hexColor: '#00BCD4' },
+      { name: 'Gift', icon: '🎁', hexColor: '#E91E63' },
+      { name: 'Refund', icon: '↩️', hexColor: '#9C27B0' },
+      { name: 'Other Income', icon: '💰', hexColor: '#FF9800' }
+    ];
+
+    const insertManyIncome = db.transaction((categories) => {
+      for (const cat of categories) {
+        insertIncomeCategory.run(cat.name, cat.icon, cat.hexColor);
+      }
+    });
+
+    insertManyIncome(defaultIncomeCategories);
   }
 };
 
