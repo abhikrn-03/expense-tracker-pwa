@@ -1,6 +1,10 @@
-*.db*
+# Ignore SQLite temp files and backups
+*.db-shm
+*.db-wal
 backups/
 emergency_backups/
+
+# Project dependencies and system files
 node_modules/
 .env
 .DS_Store
