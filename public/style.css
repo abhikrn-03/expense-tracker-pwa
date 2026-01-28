@@ -1040,6 +1040,66 @@ body {
 /* ===================================
    RESPONSIVE ADJUSTMENTS
    =================================== */
+
+/* Mobile-first styles for touch-friendly toggles */
+@media (max-width: 767px) {
+  /* Section title with toggle buttons */
+  .section-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+  }
+  
+  /* Make view toggle buttons touch-friendly on mobile */
+  .view-toggle-btn {
+    font-size: var(--font-size-base);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-bg-secondary);
+    border-radius: var(--border-radius-sm);
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .view-toggle-btn.active {
+    background: var(--color-accent-gold);
+    color: var(--color-bg-primary);
+  }
+  
+  .view-toggle-separator {
+    display: none;
+  }
+  
+  /* Analytics chart type toggle - stack on mobile */
+  .analytics-chart-toggle {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--spacing-sm);
+  }
+  
+  .analytics-toggle-btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    font-size: var(--font-size-base);
+    min-height: 44px;
+    flex: 1;
+    min-width: 80px;
+  }
+  
+  /* History view toggle section */
+  .history-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+  
+  .history-header .section-title {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 @media (min-width: 768px) {
   .summary-amount {
     font-size: 4rem;
