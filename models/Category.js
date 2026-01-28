@@ -1,6 +1,33 @@
-import db from './database.js';
+import db, { backup1Db, backup2Db } from './database.js';
 
 class Category {
+    /**
+     * Execute a write operation across all databases (triple-write)
+     */
+    static tripleWrite(operation) {
+        const transaction = db.transaction(() => {
+            // Execute on main database
+            const result = operation(db);
+
+            // Sync to backup databases
+            try {
+                if (backup1Db) {
+                    operation(backup1Db);
+                }
+                if (backup2Db) {
+                    operation(backup2Db);
+                }
+            } catch (error) {
+                console.error('Backup write failed:', error);
+                throw new Error('Failed to write to backup databases');
+            }
+
+            return result;
+        });
+
+        return transaction();
+    }
+
     /**
      * Get all categories
      * @returns {Array} Array of category objects
@@ -26,13 +53,19 @@ class Category {
      * @returns {Object} Created category with ID
      */
     static create({ name, icon, hexColor }) {
-        const stmt = db.prepare(`
-      INSERT INTO categories (name, icon, hexColor)
-      VALUES (?, ?, ?)
-    `);
+        return this.tripleWrite((database) => {
+            const stmt = database.prepare(`
+                INSERT INTO categories (name, icon, hexColor)
+                VALUES (?, ?, ?)
+            `);
 
-        const result = stmt.run(name, icon, hexColor);
-        return this.getById(result.lastInsertRowid);
+            const result = stmt.run(name, icon, hexColor);
+
+            if (database === db) {
+                return this.getById(result.lastInsertRowid);
+            }
+            return result;
+        });
     }
 
     /**
@@ -51,10 +84,15 @@ class Category {
         const values = fields.map(field => updates[field]);
         values.push(id);
 
-        const stmt = db.prepare(`UPDATE categories SET ${setClause} WHERE id = ?`);
-        stmt.run(...values);
+        return this.tripleWrite((database) => {
+            const stmt = database.prepare(`UPDATE categories SET ${setClause} WHERE id = ?`);
+            stmt.run(...values);
 
-        return this.getById(id);
+            if (database === db) {
+                return this.getById(id);
+            }
+            return null;
+        });
     }
 
     /**
@@ -63,9 +101,19 @@ class Category {
      * @returns {boolean} True if deleted, false otherwise
      */
     static delete(id) {
-        const stmt = db.prepare('DELETE FROM categories WHERE id = ?');
-        const result = stmt.run(id);
-        return result.changes > 0;
+        let deletedFromMain = false;
+
+        this.tripleWrite((database) => {
+            const stmt = database.prepare('DELETE FROM categories WHERE id = ?');
+            const result = stmt.run(id);
+
+            if (database === db) {
+                deletedFromMain = result.changes > 0;
+            }
+            return result;
+        });
+
+        return deletedFromMain;
     }
 }
 

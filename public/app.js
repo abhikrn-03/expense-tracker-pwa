@@ -114,11 +114,11 @@ const Auth = {
 
 // Validate user data structure
 function validateUserData(user) {
-    return user && 
-           typeof user === 'object' && 
-           user.id && 
-           user.username && 
-           typeof user.username === 'string';
+    return user &&
+        typeof user === 'object' &&
+        user.id &&
+        user.username &&
+        typeof user.username === 'string';
 }
 
 // Handle authentication errors globally
@@ -136,7 +136,7 @@ function handleAuthError(error) {
 async function exportExpensesToCSV() {
     try {
         const allExpenses = await API.getExpenses();
-        
+
         if (allExpenses.length === 0) {
             UI.showToast('No expenses to export', 'error');
             return;
@@ -160,7 +160,7 @@ async function exportExpensesToCSV() {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
-        
+
         const filename = `expenses_${new Date().toISOString().split('T')[0]}.csv`;
         link.setAttribute('href', url);
         link.setAttribute('download', filename);
@@ -168,7 +168,7 @@ async function exportExpensesToCSV() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
+
         UI.showToast(`Exported ${allExpenses.length} expenses`, 'success');
     } catch (error) {
         console.error('Export error:', error);
@@ -208,7 +208,10 @@ const API = {
         if (response.status === 401 || response.status === 403) {
             throw new Error('Authentication required');
         }
-        if (!response.ok) throw new Error('Failed to fetch expenses');
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to fetch expenses');
+        }
         return response.json();
     },
 
@@ -218,7 +221,13 @@ const API = {
             headers: this.getAuthHeaders(),
             body: JSON.stringify(expenseData)
         });
-        if (!response.ok) throw new Error('Failed to create expense');
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to create expense');
+        }
         return response.json();
     },
 
@@ -228,7 +237,13 @@ const API = {
             headers: this.getAuthHeaders(),
             body: JSON.stringify(expenseData)
         });
-        if (!response.ok) throw new Error('Failed to update expense');
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to update expense');
+        }
         return response.json();
     },
 
@@ -237,7 +252,13 @@ const API = {
             method: 'DELETE',
             headers: this.getAuthHeaders()
         });
-        if (!response.ok) throw new Error('Failed to delete expense');
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to delete expense');
+        }
         return response.json();
     },
 
@@ -247,7 +268,13 @@ const API = {
             headers: this.getAuthHeaders(),
             body: JSON.stringify(categoryData)
         });
-        if (!response.ok) throw new Error('Failed to create category');
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to create category');
+        }
         return response.json();
     },
 
@@ -258,7 +285,10 @@ const API = {
         if (response.status === 401 || response.status === 403) {
             throw new Error('Authentication required');
         }
-        if (!response.ok) throw new Error('Failed to fetch summary');
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to fetch summary');
+        }
         return response.json();
     },
 
@@ -269,7 +299,10 @@ const API = {
         if (response.status === 401 || response.status === 403) {
             throw new Error('Authentication required');
         }
-        if (!response.ok) throw new Error('Failed to fetch yearly summary');
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to fetch yearly summary');
+        }
         return response.json();
     }
 };
@@ -557,7 +590,7 @@ async function loadAnalyticsView() {
 async function loadYearlyChart() {
     try {
         const yearSelector = document.getElementById('yearSelector');
-        
+
         // Populate year selector if empty
         if (yearSelector.options.length === 0) {
             const currentYear = new Date().getFullYear();
@@ -575,7 +608,7 @@ async function loadYearlyChart() {
         console.log('Fetching yearly summary for year:', selectedYear);
         const yearlySummary = await API.getYearlySummary(selectedYear);
         console.log('Yearly summary received:', yearlySummary);
-        
+
         renderYearlyChart(yearlySummary);
     } catch (error) {
         console.error('Error in loadYearlyChart:', error);
@@ -586,21 +619,21 @@ async function loadYearlyChart() {
 function renderYearlyChart(data) {
     const yearlyTotalEl = document.getElementById('yearlyTotal');
     const monthlyBarsEl = document.getElementById('monthlyBars');
-    
+
     yearlyTotalEl.textContent = UI.formatCurrency(data.total);
     monthlyBarsEl.innerHTML = '';
-    
+
     // Find max amount for scaling
     const maxAmount = Math.max(...data.months.map(m => m.total), 1);
-    
+
     data.months.forEach(monthData => {
         const heightPercent = maxAmount > 0 ? (monthData.total / maxAmount * 100) : 0;
-        
+
         const barEl = document.createElement('div');
         barEl.className = 'month-bar';
         barEl.dataset.month = monthData.month;
         barEl.dataset.year = data.year;
-        
+
         barEl.innerHTML = `
             <div class="month-bar-container">
                 <div class="month-bar-fill" style="height: ${heightPercent}%;">
@@ -613,7 +646,7 @@ function renderYearlyChart(data) {
                 ${monthData.count} transaction${monthData.count !== 1 ? 's' : ''}
             </div>
         `;
-        
+
         // Click handler to filter by month
         barEl.addEventListener('click', () => {
             state.currentMonth = monthData.month;
@@ -622,7 +655,7 @@ function renderYearlyChart(data) {
             populateMonthFilter();
             loadHomeView();
         });
-        
+
         monthlyBarsEl.appendChild(barEl);
     });
 }
@@ -655,7 +688,11 @@ async function handleSaveExpense(event) {
         UI.switchView(state.currentView);
     } catch (error) {
         console.error('Error saving expense:', error);
-        UI.showToast('Failed to save expense', 'error');
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast(error.message || 'Failed to save expense', 'error');
+        }
     }
 }
 
@@ -681,7 +718,11 @@ async function handleSaveCategory(event) {
         // (Optimization: we could select the last added, but simplistic for now)
     } catch (error) {
         console.error('Error creating category:', error);
-        UI.showToast('Failed to create category', 'error');
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast(error.message || 'Failed to create category', 'error');
+        }
     }
 }
 
@@ -694,7 +735,7 @@ function showAuthModal() {
     const fab = document.getElementById('addExpenseBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const usernameGreeting = document.getElementById('usernameGreeting');
-    
+
     modal.style.display = 'flex';
     app.style.display = 'none';
     if (fab) {
@@ -733,7 +774,7 @@ function switchAuthTab(tab) {
 
 async function handleLogin(event) {
     event.preventDefault();
-    
+
     const formData = new FormData(event.target);
     const username = formData.get('username');
     const password = formData.get('password');
@@ -756,7 +797,7 @@ async function handleLogin(event) {
 
 async function handleRegister(event) {
     event.preventDefault();
-    
+
     const formData = new FormData(event.target);
     const username = formData.get('username');
     const password = formData.get('password');
@@ -898,26 +939,26 @@ async function initApp() {
         const fab = document.getElementById('addExpenseBtn');
         const logoutBtn = document.getElementById('logoutBtn');
         const usernameGreeting = document.getElementById('usernameGreeting');
-        
+
         // Validate user data before proceeding
         if (!validateUserData(state.currentUser)) {
             throw new Error('Invalid user data');
         }
-        
+
         // Show logout button
         if (logoutBtn) logoutBtn.style.display = 'block';
-        
+
         // Show export button
         const exportBtn = document.getElementById('exportBtn');
         if (exportBtn) exportBtn.style.display = 'block';
-        
+
         // Display username greeting (data already verified)
         if (usernameGreeting) {
             usernameGreeting.textContent = `Hi ${state.currentUser.username}!`;
             usernameGreeting.style.display = 'block';
             console.log('Username greeting displayed:', state.currentUser.username);
         }
-        
+
         // Show FAB
         if (fab) {
             fab.style.display = 'flex';
@@ -925,14 +966,14 @@ async function initApp() {
             fab.style.opacity = '1';
             console.log('FAB displayed');
         }
-        
+
         // Load initial data
         await populateCategorySelect();
         populateMonthFilter();
-        
+
         // Load the last viewed page (or home by default)
         UI.switchView(state.currentView);
-        
+
         // Show app container after everything is loaded
         const appContainer = document.getElementById('app');
         appContainer.style.display = 'flex';
@@ -945,24 +986,24 @@ async function initApp() {
 
 async function init() {
     console.log('=== INIT CALLED ===');
-    
+
     // Hide app content initially
     const appContainer = document.getElementById('app');
     const authModal = document.getElementById('authModal');
     appContainer.style.display = 'none';
     authModal.style.display = 'none';
-    
+
     UI.updateCurrentDate();
     initEventListeners();
 
     // Verify authentication state
     console.log('Checking authentication state...');
-    
+
     if (state.authToken) {
         // Token exists, verify it with the server
         console.log('Token found, verifying with server...');
         const user = await Auth.verifyToken();
-        
+
         if (user && validateUserData(user)) {
             // Valid token and user data
             console.log('Token verified, user authenticated:', user.username);

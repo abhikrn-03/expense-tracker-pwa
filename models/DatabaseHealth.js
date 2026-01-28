@@ -1,4 +1,10 @@
 import db, { BackupManager } from './database.js';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 class DatabaseHealth {
   /**
@@ -17,25 +23,23 @@ class DatabaseHealth {
     try {
       // Check main database integrity
       health.mainDb.integrity = BackupManager.verifyIntegrity(db);
-      
+
       if (!health.mainDb.integrity) {
         health.status = 'corrupted';
         health.errors.push('Main database integrity check failed');
       }
 
       // Get database size
-      const fs = require('fs');
-      const path = require('path');
-      const dbPath = path.join(__dirname, '..', 'expenses.db');
-      
+      const dbPath = join(__dirname, '..', 'expenses.db');
+
       if (fs.existsSync(dbPath)) {
         const stats = fs.statSync(dbPath);
         health.mainDb.size = stats.size;
       }
 
       // Check backups
-      const backup1Path = path.join(__dirname, '..', 'backups', 'expenses_backup1.db');
-      const backup2Path = path.join(__dirname, '..', 'backups', 'expenses_backup2.db');
+      const backup1Path = join(__dirname, '..', 'backups', 'expenses_backup1.db');
+      const backup2Path = join(__dirname, '..', 'backups', 'expenses_backup2.db');
 
       health.backup1.exists = fs.existsSync(backup1Path);
       health.backup2.exists = fs.existsSync(backup2Path);
@@ -79,10 +83,10 @@ class DatabaseHealth {
    */
   static attemptRecovery() {
     console.log('🔧 Attempting automatic recovery...');
-    
+
     if (!BackupManager.verifyIntegrity(db)) {
       console.log('Main database corrupted, attempting restore...');
-      
+
       // Try backup1
       if (BackupManager.restoreFromBackup(1)) {
         console.log('✅ Recovered from backup1');

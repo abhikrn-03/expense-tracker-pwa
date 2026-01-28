@@ -76,7 +76,7 @@ class BackupManager {
   static restoreFromBackup(backupNum = 1) {
     try {
       const sourcePath = backupNum === 1 ? backup1Path : backup2Path;
-      
+
       if (!fs.existsSync(sourcePath)) {
         console.error(`Backup ${backupNum} not found`);
         return false;
@@ -97,7 +97,7 @@ class BackupManager {
 
       // Copy backup to main
       fs.copyFileSync(sourcePath, mainDbPath);
-      
+
       console.log(`✅ Restored from backup ${backupNum}`);
       return true;
     } catch (error) {
@@ -151,31 +151,63 @@ const initDB = () => {
     // Migrate main database
     const tableInfo = db.prepare("PRAGMA table_info(expenses)").all();
     const hasWhereSpent = tableInfo.some(col => col.name === 'whereSpent');
-    
+
     if (!hasWhereSpent) {
       console.log('📦 Migrating main database: Adding whereSpent column...');
       db.prepare('ALTER TABLE expenses ADD COLUMN whereSpent TEXT DEFAULT ""').run();
-      console.log('✅ Main database migration completed');
+      console.log('✅ Main database migration completed (whereSpent)');
+    }
+
+    const hasUserId = tableInfo.some(col => col.name === 'userId');
+    if (!hasUserId) {
+      console.log('📦 Migrating main database: Adding userId column...');
+      // Default to user ID 1 for existing data
+      db.prepare('ALTER TABLE expenses ADD COLUMN userId INTEGER NOT NULL DEFAULT 1').run();
+      console.log('✅ Main database migration completed (userId)');
     }
 
     // Migrate backup databases
     if (backup1Db) {
-      const backup1Info = backup1Db.prepare("PRAGMA table_info(expenses)").all();
-      const backup1HasWhereSpent = backup1Info.some(col => col.name === 'whereSpent');
-      if (!backup1HasWhereSpent) {
-        console.log('📦 Migrating backup1 database: Adding whereSpent column...');
-        backup1Db.prepare('ALTER TABLE expenses ADD COLUMN whereSpent TEXT DEFAULT ""').run();
-        console.log('✅ Backup1 migration completed');
+      // Check if table exists first
+      const tableExists = backup1Db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='expenses'").get();
+
+      if (tableExists) {
+        const backup1Info = backup1Db.prepare("PRAGMA table_info(expenses)").all();
+        const backup1HasWhereSpent = backup1Info.some(col => col.name === 'whereSpent');
+        if (!backup1HasWhereSpent) {
+          console.log('📦 Migrating backup1 database: Adding whereSpent column...');
+          backup1Db.prepare('ALTER TABLE expenses ADD COLUMN whereSpent TEXT DEFAULT ""').run();
+          console.log('✅ Backup1 migration completed (whereSpent)');
+        }
+
+        const backup1HasUserId = backup1Info.some(col => col.name === 'userId');
+        if (!backup1HasUserId) {
+          console.log('📦 Migrating backup1 database: Adding userId column...');
+          backup1Db.prepare('ALTER TABLE expenses ADD COLUMN userId INTEGER NOT NULL DEFAULT 1').run();
+          console.log('✅ Backup1 migration completed (userId)');
+        }
       }
     }
 
     if (backup2Db) {
-      const backup2Info = backup2Db.prepare("PRAGMA table_info(expenses)").all();
-      const backup2HasWhereSpent = backup2Info.some(col => col.name === 'whereSpent');
-      if (!backup2HasWhereSpent) {
-        console.log('📦 Migrating backup2 database: Adding whereSpent column...');
-        backup2Db.prepare('ALTER TABLE expenses ADD COLUMN whereSpent TEXT DEFAULT ""').run();
-        console.log('✅ Backup2 migration completed');
+      // Check if table exists first
+      const tableExists = backup2Db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='expenses'").get();
+
+      if (tableExists) {
+        const backup2Info = backup2Db.prepare("PRAGMA table_info(expenses)").all();
+        const backup2HasWhereSpent = backup2Info.some(col => col.name === 'whereSpent');
+        if (!backup2HasWhereSpent) {
+          console.log('📦 Migrating backup2 database: Adding whereSpent column...');
+          backup2Db.prepare('ALTER TABLE expenses ADD COLUMN whereSpent TEXT DEFAULT ""').run();
+          console.log('✅ Backup2 migration completed (whereSpent)');
+        }
+
+        const backup2HasUserId = backup2Info.some(col => col.name === 'userId');
+        if (!backup2HasUserId) {
+          console.log('📦 Migrating backup2 database: Adding userId column...');
+          backup2Db.prepare('ALTER TABLE expenses ADD COLUMN userId INTEGER NOT NULL DEFAULT 1').run();
+          console.log('✅ Backup2 migration completed (userId)');
+        }
       }
     }
   } catch (error) {
@@ -184,7 +216,7 @@ const initDB = () => {
 
   // Insert default categories if table is empty
   const categoryCount = db.prepare('SELECT COUNT(*) as count FROM categories').get();
-  
+
   if (categoryCount.count === 0) {
     const insertCategory = db.prepare(
       'INSERT INTO categories (name, icon, hexColor) VALUES (?, ?, ?)'
@@ -214,7 +246,7 @@ const initDB = () => {
 // Startup integrity check and recovery
 const performStartupCheck = () => {
   console.log('🔍 Performing database integrity check...');
-  
+
   if (BackupManager.verifyIntegrity()) {
     console.log('✅ Main database integrity OK');
     // Create initial backups if they don't exist
@@ -223,7 +255,7 @@ const performStartupCheck = () => {
   }
 
   console.error('❌ Main database corrupted! Attempting recovery...');
-  
+
   // Try restoring from backup1
   if (BackupManager.restoreFromBackup(1)) {
     console.log('✅ Restored from backup1');

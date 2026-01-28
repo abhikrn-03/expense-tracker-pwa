@@ -1,6 +1,8 @@
+*.db*
+backups/
+emergency_backups/
 node_modules/
 .env
-*.db
-*.db-journal
 .DS_Store
 certs/
+*.log
