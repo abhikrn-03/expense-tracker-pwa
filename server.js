@@ -13,6 +13,9 @@ import IncomeCategory from './models/IncomeCategory.js';
 import Account from './models/Account.js';
 import User from './models/User.js';
 import DatabaseHealth from './models/DatabaseHealth.js';
+import Investment from './models/Investment.js';
+import FixedDeposit from './models/FixedDeposit.js';
+import PFEntry from './models/PFEntry.js';
 
 dotenv.config();
 
@@ -210,6 +213,70 @@ app.post('/api/auth/verify', authenticateToken, (req, res) => {
                 createdAt: user.createdAt
             }
         });
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Set or update PIN for authenticated user
+app.post('/api/auth/pin', authenticateToken, async (req, res) => {
+    try {
+        const { password, pin } = req.body;
+        
+        // Validate inputs
+        if (!password || !pin) {
+            return res.status(400).json({ error: 'Password and PIN are required' });
+        }
+        
+        // Validate PIN format (4-6 digits)
+        if (!/^\d{4,6}$/.test(pin)) {
+            return res.status(400).json({ error: 'PIN must be 4-6 digits' });
+        }
+        
+        // Get user and verify password
+        const user = User.getById(req.user.userId);
+        if (!user) {
+            return res.status(401).json({ error: 'User not found' });
+        }
+        
+        const fullUser = User.getByUsername(user.username);
+        const isPasswordValid = await User.verifyPassword(password, fullUser.passwordHash, fullUser.salt);
+        
+        if (!isPasswordValid) {
+            return res.status(401).json({ error: 'Invalid password' });
+        }
+        
+        // Set the PIN
+        await User.setPin(req.user.userId, pin);
+        
+        res.json({ success: true, message: 'PIN set successfully' });
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Verify PIN for authenticated user
+app.post('/api/auth/verify-pin', authenticateToken, async (req, res) => {
+    try {
+        const { pin } = req.body;
+        
+        if (!pin) {
+            return res.status(400).json({ error: 'PIN is required' });
+        }
+        
+        const isValid = await User.verifyPin(req.user.userId, pin);
+        
+        res.json({ valid: isValid });
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Check if user has PIN set
+app.get('/api/auth/has-pin', authenticateToken, (req, res) => {
+    try {
+        const hasPin = User.hasPin(req.user.userId);
+        res.json({ hasPin });
     } catch (error) {
         handleDatabaseError(error, res);
     }
@@ -551,6 +618,68 @@ app.delete('/api/accounts/:id', authenticateToken, (req, res) => {
     }
 });
 
+// ===== PF (Provident Fund) Routes =====
+
+app.get('/api/pf', authenticateToken, (req, res) => {
+    try {
+        const { type, financialYear } = req.query;
+        const filters = {};
+        if (type) filters.type = type;
+        if (financialYear) filters.financialYear = financialYear;
+
+        const entries = PFEntry.getAll(req.user.userId, filters);
+        const summary = PFEntry.getSummary(req.user.userId);
+        const years = PFEntry.getFinancialYears(req.user.userId);
+
+        res.json({
+            entries,
+            summary,
+            financialYears: years
+        });
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+app.post('/api/pf', authenticateToken, (req, res) => {
+    try {
+        const { type, amount, date, financialYear, note } = req.body;
+        
+        if (!type || !amount || !date) {
+            return res.status(400).json({ error: 'type, amount, and date are required' });
+        }
+
+        if (type === 'interest' && !financialYear) {
+            return res.status(400).json({ error: 'financialYear is required for interest entries' });
+        }
+
+        const entry = PFEntry.create(req.user.userId, {
+            type,
+            amount: parseFloat(amount),
+            date,
+            financialYear,
+            note
+        });
+
+        res.json(entry);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+app.delete('/api/pf/:id', authenticateToken, (req, res) => {
+    try {
+        const success = PFEntry.delete(parseInt(req.params.id), req.user.userId);
+        if (success) {
+            res.json({ success: true, message: 'PF entry deleted' });
+        } else {
+            res.status(404).json({ error: 'PF entry not found' });
+        }
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
 // ===== Database Health Routes =====
 
 app.get('/api/health/database', authenticateToken, (req, res) => {
@@ -577,6 +706,290 @@ app.post('/api/health/backup', authenticateToken, (req, res) => {
             message: 'Manual backup completed',
             result
         });
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// ===== Investment Routes =====
+
+// Cache for Alpha Vantage API responses (60 second TTL)
+const apiCache = new Map();
+const CACHE_TTL = 60000; // 60 seconds
+
+// Helper function to fetch with caching
+async function fetchWithCache(url, cacheKey) {
+    const cached = apiCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        return cached.data;
+    }
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`API request failed: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    apiCache.set(cacheKey, { data, timestamp: Date.now() });
+    
+    return data;
+}
+
+// Get all investments for user
+app.get('/api/investments', authenticateToken, (req, res) => {
+    try {
+        const investments = Investment.getAll(req.user.userId);
+        res.json(investments);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Create or update an investment
+app.post('/api/investments', authenticateToken, (req, res) => {
+    try {
+        const { ticker, shares_owned, manual_price_override, manual_rate_override } = req.body;
+
+        if (!ticker || shares_owned === undefined || shares_owned === null) {
+            return res.status(400).json({ error: 'Ticker and shares_owned are required' });
+        }
+
+        const investment = Investment.upsert(req.user.userId, {
+            ticker,
+            shares_owned: parseFloat(shares_owned),
+            manual_price_override: manual_price_override ? parseFloat(manual_price_override) : null,
+            manual_rate_override: manual_rate_override ? parseFloat(manual_rate_override) : null
+        });
+
+        res.json(investment);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Delete an investment
+app.delete('/api/investments/:ticker', authenticateToken, (req, res) => {
+    try {
+        const { ticker } = req.params;
+        const success = Investment.delete(req.user.userId, ticker);
+
+        if (success) {
+            res.json({ success: true, message: 'Investment deleted' });
+        } else {
+            res.status(404).json({ error: 'Investment not found' });
+        }
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+// Calculate investment portfolio value
+app.get('/api/investments/calculate', authenticateToken, async (req, res) => {
+    try {
+        const investments = Investment.getAll(req.user.userId);
+
+        if (investments.length === 0) {
+            return res.json({
+                holdings: [],
+                totalINR: 0,
+                exchangeRate: null,
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        const apiKey = process.env.ALPHA_VANTAGE_KEY;
+        if (!apiKey) {
+            return res.status(500).json({ error: 'ALPHA_VANTAGE_KEY not configured' });
+        }
+
+        // Helper to delay between API calls
+        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        // Fetch exchange rate (USD to INR)
+        let exchangeRate = null;
+        const rateOverride = investments.find(inv => inv.manual_rate_override);
+        
+        if (rateOverride && rateOverride.manual_rate_override) {
+            exchangeRate = rateOverride.manual_rate_override;
+        } else {
+            try {
+                const rateUrl = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=USD&to_currency=INR&apikey=${apiKey}`;
+                const rateData = await fetchWithCache(rateUrl, 'USD_INR');
+                
+                if (rateData['Realtime Currency Exchange Rate']) {
+                    exchangeRate = parseFloat(rateData['Realtime Currency Exchange Rate']['5. Exchange Rate']);
+                } else {
+                    throw new Error('Failed to fetch exchange rate');
+                }
+                
+                // Wait 2 seconds before next API call
+                await delay(2000);
+            } catch (error) {
+                console.error('Exchange rate fetch error:', error);
+                return res.status(500).json({ error: 'Failed to fetch USD/INR exchange rate. Try setting manual_rate_override.' });
+            }
+        }
+
+        // Fetch stock prices sequentially with delays to avoid rate limiting
+        const holdings = [];
+        for (const investment of investments) {
+            let stockPrice = investment.manual_price_override;
+
+            if (!stockPrice) {
+                try {
+                    const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${investment.ticker}&apikey=${apiKey}`;
+                    const quoteData = await fetchWithCache(quoteUrl, investment.ticker);
+                    
+                    console.log(`API Response for ${investment.ticker}:`, JSON.stringify(quoteData));
+                    
+                    if (quoteData['Global Quote'] && quoteData['Global Quote']['05. price']) {
+                        stockPrice = parseFloat(quoteData['Global Quote']['05. price']);
+                    } else if (quoteData['Note']) {
+                        // API rate limit exceeded
+                        holdings.push({
+                            ticker: investment.ticker,
+                            shares: investment.shares_owned,
+                            priceUSD: null,
+                            valueUSD: null,
+                            valueINR: null,
+                            error: 'API rate limit exceeded. Please wait a moment or set manual_price_override.'
+                        });
+                        continue;
+                    } else if (quoteData['Information']) {
+                        // API information message
+                        holdings.push({
+                            ticker: investment.ticker,
+                            shares: investment.shares_owned,
+                            priceUSD: null,
+                            valueUSD: null,
+                            valueINR: null,
+                            error: 'API message: ' + quoteData['Information']
+                        });
+                        continue;
+                    } else {
+                        console.error(`Unexpected API response structure for ${investment.ticker}:`, quoteData);
+                        throw new Error('Failed to fetch stock price');
+                    }
+                    
+                    // Wait 2 seconds before next API call (if not last investment)
+                    if (investments.indexOf(investment) < investments.length - 1) {
+                        await delay(2000);
+                    }
+                } catch (error) {
+                    console.error(`Stock price fetch error for ${investment.ticker}:`, error);
+                    holdings.push({
+                        ticker: investment.ticker,
+                        shares: investment.shares_owned,
+                        priceUSD: null,
+                        valueUSD: null,
+                        valueINR: null,
+                        error: 'Failed to fetch price. Set manual_price_override.'
+                    });
+                    continue;
+                }
+            }
+
+            const valueUSD = investment.shares_owned * stockPrice;
+            const valueINR = valueUSD * exchangeRate;
+
+            holdings.push({
+                ticker: investment.ticker,
+                shares: investment.shares_owned,
+                priceUSD: stockPrice,
+                valueUSD: valueUSD,
+                valueINR: valueINR,
+                manualPrice: !!investment.manual_price_override,
+                manualRate: !!investment.manual_rate_override
+            });
+        }
+
+        const totalINR = holdings.reduce((sum, h) => sum + (h.valueINR || 0), 0);
+
+        res.json({
+            holdings,
+            totalINR,
+            exchangeRate,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Calculate error:', error);
+        handleDatabaseError(error, res);
+    }
+});
+
+// ===== Fixed Deposit Routes =====
+
+app.get('/api/fixed-deposits', authenticateToken, (req, res) => {
+    try {
+        const deposits = FixedDeposit.getAll(req.user.userId);
+        const depositsWithValues = deposits.map(fd => ({
+            ...fd,
+            currentValue: FixedDeposit.calculateCurrentValue(fd),
+            maturityValue: FixedDeposit.calculateMaturityValue(fd)
+        }));
+        res.json(depositsWithValues);
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+app.post('/api/fixed-deposits', authenticateToken, (req, res) => {
+    try {
+        const { bankName, principal, rateOfInterest, startDate, maturityDate, note } = req.body;
+        if (!bankName || !principal || !rateOfInterest || !startDate || !maturityDate) {
+            return res.status(400).json({ error: 'bankName, principal, rateOfInterest, startDate, and maturityDate are required' });
+        }
+        const deposit = FixedDeposit.create(req.user.userId, {
+            bankName,
+            principal: parseFloat(principal),
+            rateOfInterest: parseFloat(rateOfInterest),
+            startDate,
+            maturityDate,
+            note
+        });
+        res.json({
+            ...deposit,
+            currentValue: FixedDeposit.calculateCurrentValue(deposit),
+            maturityValue: FixedDeposit.calculateMaturityValue(deposit)
+        });
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+app.put('/api/fixed-deposits/:id', authenticateToken, (req, res) => {
+    try {
+        const { bankName, principal, rateOfInterest, startDate, maturityDate, note } = req.body;
+        const deposit = FixedDeposit.update(parseInt(req.params.id), req.user.userId, {
+            bankName,
+            principal: parseFloat(principal),
+            rateOfInterest: parseFloat(rateOfInterest),
+            startDate,
+            maturityDate,
+            note
+        });
+        if (deposit) {
+            res.json({
+                ...deposit,
+                currentValue: FixedDeposit.calculateCurrentValue(deposit),
+                maturityValue: FixedDeposit.calculateMaturityValue(deposit)
+            });
+        } else {
+            res.status(404).json({ error: 'Fixed deposit not found' });
+        }
+    } catch (error) {
+        handleDatabaseError(error, res);
+    }
+});
+
+app.delete('/api/fixed-deposits/:id', authenticateToken, (req, res) => {
+    try {
+        const success = FixedDeposit.delete(parseInt(req.params.id), req.user.userId);
+        if (success) {
+            res.json({ success: true, message: 'Fixed deposit deleted' });
+        } else {
+            res.status(404).json({ error: 'Fixed deposit not found' });
+        }
     } catch (error) {
         handleDatabaseError(error, res);
     }

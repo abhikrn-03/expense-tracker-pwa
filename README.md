@@ -125,6 +125,43 @@ expense-tracker-pwa/
 ### Categories
 - `GET /api/categories` - Get all categories
 
+### Investments (Nasdaq)
+- `GET /api/investments` - Get all stock holdings
+- `POST /api/investments` - Add/update stock holding
+- `DELETE /api/investments/:ticker` - Delete stock holding
+- `GET /api/investments/calculate` - Calculate portfolio value with live prices
+
+### Fixed Deposits
+- `GET /api/fixed-deposits` - Get all fixed deposits with current/maturity values
+- `POST /api/fixed-deposits` - Create fixed deposit
+- `PUT /api/fixed-deposits/:id` - Update fixed deposit
+- `DELETE /api/fixed-deposits/:id` - Delete fixed deposit
+
+## 📈 Alpha Vantage API Integration
+
+The Investments section uses [Alpha Vantage](https://www.alphavantage.co/) for live stock prices and USD/INR exchange rates.
+
+### Configuration
+Set your API key in `.env`:
+```
+ALPHA_VANTAGE_KEY=your_api_key_here
+```
+
+Get a free API key at: https://www.alphavantage.co/support/#api-key
+
+### ⚠️ API Rate Limits (Free Tier)
+
+| Limit Type | Value |
+|------------|-------|
+| **Per Second** | 1 API request |
+| **Per Day** | 25 API requests |
+
+**Important Notes:**
+- The app automatically adds a 2-second delay between API calls to respect rate limits
+- Cached responses are stored for 60 seconds to minimize API usage
+- If rate limited, use the "Manual Price Override" and "Manual Rate Override" fields to bypass API calls
+- Consider upgrading to a paid plan for higher limits in production use
+
 ## 📊 Database Schema
 
 ### Expenses Table

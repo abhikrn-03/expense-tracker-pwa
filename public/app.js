@@ -8,6 +8,15 @@ const state = {
     incomeCategories: [],
     accounts: [],
     defaultAccount: null,
+    investments: [],
+    investmentResults: null,
+    investmentType: 'nasdaq', // 'nasdaq', 'mutual-funds', 'crypto'
+    fixedDeposits: [],
+    currentFDId: null,
+    pfEntries: [],
+    pfSummary: null,
+    pfFinancialYears: [],
+    pfFilters: { type: '', financialYear: '' },
     currentView: localStorage.getItem('currentView') || 'home',
     viewType: 'expense', // 'expense' or 'income'
     analyticsChartType: 'expense', // 'expense', 'income', or 'net'
@@ -15,8 +24,11 @@ const state = {
     currentYear: new Date().getFullYear(),
     currentExpenseId: null, // Track if we are editing
     currentIncomeId: null,
+    currentInvestmentTicker: null, // Track if we are editing
     authToken: localStorage.getItem('authToken') || null,
-    currentUser: JSON.parse(localStorage.getItem('currentUser') || 'null')
+    currentUser: JSON.parse(localStorage.getItem('currentUser') || 'null'),
+    privilegedMode: sessionStorage.getItem('privilegedMode') === 'true',
+    hasPin: false
 };
 
 // ===================================
@@ -86,6 +98,8 @@ const Auth = {
 
     logout() {
         this.clearAuth();
+        state.privilegedMode = false;
+        sessionStorage.removeItem('privilegedMode');
         location.reload();
     },
 
@@ -513,6 +527,224 @@ const API = {
             throw new Error(error.error || 'Failed to delete account');
         }
         return response.json();
+    },
+
+    // Investment API functions
+    async getInvestments() {
+        const response = await fetch('/api/investments', {
+            headers: this.getAuthHeaders()
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to fetch investments');
+        }
+        return response.json();
+    },
+
+    async createInvestment(investmentData) {
+        const response = await fetch('/api/investments', {
+            method: 'POST',
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify(investmentData)
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to create investment');
+        }
+        return response.json();
+    },
+
+    async deleteInvestment(ticker) {
+        const response = await fetch(`/api/investments/${ticker}`, {
+            method: 'DELETE',
+            headers: this.getAuthHeaders()
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to delete investment');
+        }
+        return response.json();
+    },
+
+    async calculateInvestments() {
+        const response = await fetch('/api/investments/calculate', {
+            headers: this.getAuthHeaders()
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to calculate investments');
+        }
+        return response.json();
+    },
+
+    // Fixed Deposit API functions
+    async getFixedDeposits() {
+        const response = await fetch('/api/fixed-deposits', {
+            headers: this.getAuthHeaders()
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to fetch fixed deposits');
+        }
+        return response.json();
+    },
+
+    async createFixedDeposit(data) {
+        const response = await fetch('/api/fixed-deposits', {
+            method: 'POST',
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to create fixed deposit');
+        }
+        return response.json();
+    },
+
+    async updateFixedDeposit(id, data) {
+        const response = await fetch(`/api/fixed-deposits/${id}`, {
+            method: 'PUT',
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to update fixed deposit');
+        }
+        return response.json();
+    },
+
+    async deleteFixedDeposit(id) {
+        const response = await fetch(`/api/fixed-deposits/${id}`, {
+            method: 'DELETE',
+            headers: this.getAuthHeaders()
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to delete fixed deposit');
+        }
+        return response.json();
+    },
+
+    // PF API functions
+    async getPFEntries(filters = {}) {
+        const params = new URLSearchParams();
+        if (filters.type) params.append('type', filters.type);
+        if (filters.financialYear) params.append('financialYear', filters.financialYear);
+
+        const response = await fetch(`/api/pf?${params}`, {
+            headers: this.getAuthHeaders()
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to fetch PF entries');
+        }
+        return response.json();
+    },
+
+    async createPFEntry(data) {
+        const response = await fetch('/api/pf', {
+            method: 'POST',
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to create PF entry');
+        }
+        return response.json();
+    },
+
+    async deletePFEntry(id) {
+        const response = await fetch(`/api/pf/${id}`, {
+            method: 'DELETE',
+            headers: this.getAuthHeaders()
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to delete PF entry');
+        }
+        return response.json();
+    },
+
+    // PIN API functions
+    async hasPin() {
+        const response = await fetch('/api/auth/has-pin', {
+            headers: this.getAuthHeaders()
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            throw new Error('Failed to check PIN status');
+        }
+        return response.json();
+    },
+
+    async setPin(password, pin) {
+        const response = await fetch('/api/auth/pin', {
+            method: 'POST',
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify({ password, pin })
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to set PIN');
+        }
+        return response.json();
+    },
+
+    async verifyPin(pin) {
+        const response = await fetch('/api/auth/verify-pin', {
+            method: 'POST',
+            headers: this.getAuthHeaders(),
+            body: JSON.stringify({ pin })
+        });
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Authentication required');
+        }
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to verify PIN');
+        }
+        return response.json();
     }
 };
 
@@ -558,6 +790,7 @@ const UI = {
 
     updateCurrentDate() {
         const dateEl = document.getElementById('currentDate');
+        if (!dateEl) return; // Element removed, skip update
         const now = new Date();
         const formatted = now.toLocaleDateString('en-IN', {
             weekday: 'long',
@@ -586,6 +819,10 @@ const UI = {
             loadHistoryView();
         } else if (viewName === 'analytics') {
             loadAnalyticsView();
+        } else if (viewName === 'investments') {
+            loadInvestmentsView();
+        } else if (viewName === 'settings') {
+            loadSettingsView();
         }
     },
 
@@ -899,6 +1136,12 @@ async function loadHistoryView() {
 
 async function loadAnalyticsView() {
     try {
+        // Hide category details and show breakdown
+        document.getElementById('categoryDetailsSection').style.display = 'none';
+        document.querySelector('.yearly-overview').style.display = 'block';
+        document.querySelector('.analytics-summary').style.display = 'block';
+        document.querySelector('.chart-section').style.display = 'block';
+
         // Load yearly chart data
         try {
             await loadYearlyChart();
@@ -923,6 +1166,7 @@ async function loadAnalyticsView() {
 
                 const barEl = document.createElement('div');
                 barEl.className = 'category-bar';
+                barEl.style.cursor = 'pointer';
                 barEl.innerHTML = `
           <div class="category-bar-header">
             <div class="category-bar-icon" style="border-color: ${category.hexColor}; background: ${category.hexColor}20;">
@@ -939,6 +1183,11 @@ async function loadAnalyticsView() {
           <div class="category-bar-percentage">${percentage.toFixed(1)}% • ${category.count} transaction${category.count !== 1 ? 's' : ''}</div>
         `;
 
+                // Add click handler to show category transactions
+                barEl.addEventListener('click', () => {
+                    loadCategoryTransactions(category.id, category.name, category.icon, category.hexColor);
+                });
+
                 chartContainer.appendChild(barEl);
             });
         }
@@ -948,6 +1197,558 @@ async function loadAnalyticsView() {
             handleAuthError(error);
         } else {
             UI.showToast('Failed to load analytics', 'error');
+        }
+    }
+}
+
+async function loadCategoryTransactions(categoryId, categoryName, categoryIcon, categoryColor) {
+    try {
+        // Hide breakdown, show category details
+        document.querySelector('.yearly-overview').style.display = 'none';
+        document.querySelector('.analytics-summary').style.display = 'none';
+        document.querySelector('.chart-section').style.display = 'none';
+        document.getElementById('categoryDetailsSection').style.display = 'block';
+
+        // Update title
+        const titleEl = document.getElementById('categoryDetailsTitle');
+        titleEl.innerHTML = `
+            <div class="category-bar-icon" style="border-color: ${categoryColor}; background: ${categoryColor}20; display: inline-block; margin-right: 8px;">
+                ${categoryIcon}
+            </div>
+            ${categoryName}
+        `;
+
+        // Fetch transactions for this category in current month
+        const expenses = await API.getExpenses(state.currentMonth, state.currentYear);
+        const categoryExpenses = expenses.filter(e => e.categoryId === categoryId);
+
+        const listContainer = document.getElementById('categoryTransactionsList');
+        listContainer.innerHTML = '';
+
+        if (categoryExpenses.length === 0) {
+            listContainer.innerHTML = UI.renderEmptyState('No transactions in this category', '📝');
+            return;
+        }
+
+        categoryExpenses.forEach(expense => {
+            listContainer.appendChild(UI.renderTransactionItem(expense, true));
+        });
+    } catch (error) {
+        console.error('Error loading category transactions:', error);
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast('Failed to load transactions', 'error');
+        }
+    }
+}
+
+// ===================================
+// INVESTMENTS VIEW
+// ===================================
+
+async function loadInvestmentsView() {
+    try {
+        const investments = await API.getInvestments();
+        state.investments = investments;
+
+        renderHoldingsList();
+        
+        // Hide results initially
+        document.getElementById('portfolioResults').style.display = 'none';
+    } catch (error) {
+        console.error('Error loading investments view:', error);
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast('Failed to load investments', 'error');
+        }
+    }
+}
+
+function renderHoldingsList() {
+    const listContainer = document.getElementById('stockHoldingsList');
+    listContainer.innerHTML = '';
+
+    if (state.investments.length === 0) {
+        listContainer.innerHTML = UI.renderEmptyState('No stocks added yet', '📈');
+        return;
+    }
+
+    state.investments.forEach(investment => {
+        const holdingEl = document.createElement('div');
+        holdingEl.className = 'holding-item';
+        
+        const badges = [];
+        if (investment.manual_price_override) {
+            badges.push('<span class="override-badge">Manual Price</span>');
+        }
+        if (investment.manual_rate_override) {
+            badges.push('<span class="override-badge">Manual Rate</span>');
+        }
+
+        holdingEl.innerHTML = `
+            <div class="holding-icon">${investment.ticker.charAt(0)}</div>
+            <div class="holding-details">
+                <div class="holding-ticker">${investment.ticker}</div>
+                <div class="holding-shares">${investment.shares_owned} shares</div>
+                ${badges.length > 0 ? `<div class="holding-badges">${badges.join('')}</div>` : ''}
+            </div>
+            <button class="btn-delete" data-ticker="${investment.ticker}">🗑️</button>
+        `;
+
+        // Add delete handler
+        const deleteBtn = holdingEl.querySelector('.btn-delete');
+        deleteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (confirm(`Delete ${investment.ticker}?`)) {
+                try {
+                    await API.deleteInvestment(investment.ticker);
+                    UI.showToast('Investment deleted', 'success');
+                    await loadInvestmentsView();
+                } catch (error) {
+                    console.error('Error deleting investment:', error);
+                    UI.showToast('Failed to delete investment', 'error');
+                }
+            }
+        });
+
+        // Add edit handler
+        holdingEl.addEventListener('click', () => {
+            openInvestmentModal(investment);
+        });
+
+        listContainer.appendChild(holdingEl);
+    });
+}
+
+async function calculatePortfolio() {
+    try {
+        UI.showToast('Calculating...', 'info');
+        const results = await API.calculateInvestments();
+        state.investmentResults = results;
+
+        renderCalculationResults(results);
+        
+        // Show results card
+        document.getElementById('portfolioResults').style.display = 'block';
+        
+        UI.showToast('Portfolio calculated', 'success');
+    } catch (error) {
+        console.error('Error calculating portfolio:', error);
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast(error.message || 'Failed to calculate portfolio', 'error');
+        }
+    }
+}
+
+function renderCalculationResults(results) {
+    document.getElementById('totalValueINR').textContent = UI.formatCurrency(results.totalINR);
+    
+    const exchangeRateDisplay = document.getElementById('exchangeRateDisplay');
+    exchangeRateDisplay.textContent = results.exchangeRate ? 
+        `$1 = ₹${results.exchangeRate.toFixed(2)}` : 'N/A';
+
+    const timestamp = new Date(results.timestamp);
+    document.getElementById('resultsTimestamp').textContent = 
+        `Updated: ${timestamp.toLocaleString('en-IN', { 
+            dateStyle: 'short', 
+            timeStyle: 'short' 
+        })}`;
+
+    const breakdownContainer = document.getElementById('holdingsBreakdown');
+    breakdownContainer.innerHTML = '';
+
+    results.holdings.forEach(holding => {
+        const holdingCard = document.createElement('div');
+        holdingCard.className = 'holding-breakdown-item';
+
+        if (holding.error) {
+            holdingCard.innerHTML = `
+                <div class="breakdown-header">
+                    <span class="breakdown-ticker">${holding.ticker}</span>
+                    <span class="breakdown-error">Error</span>
+                </div>
+                <div class="breakdown-error-msg">${holding.error}</div>
+            `;
+        } else {
+            const badges = [];
+            if (holding.manualPrice) badges.push('Manual Price');
+            if (holding.manualRate) badges.push('Manual Rate');
+
+            holdingCard.innerHTML = `
+                <div class="breakdown-header">
+                    <span class="breakdown-ticker">${holding.ticker}</span>
+                    <span class="breakdown-value">${UI.formatCurrency(holding.valueINR)}</span>
+                </div>
+                <div class="breakdown-details">
+                    ${holding.shares.toFixed(4)} shares × $${holding.priceUSD.toFixed(2)} = $${holding.valueUSD.toFixed(2)}
+                    ${badges.length > 0 ? `<span class="breakdown-badges">(${badges.join(', ')})</span>` : ''}
+                </div>
+            `;
+        }
+
+        breakdownContainer.appendChild(holdingCard);
+    });
+}
+
+function openInvestmentModal(investment = null) {
+    const modal = document.getElementById('investmentModal');
+    const form = document.getElementById('investmentForm');
+    const title = modal.querySelector('.modal-title');
+    const btn = document.getElementById('saveInvestmentBtn');
+
+    modal.classList.add('active');
+
+    if (investment) {
+        // Edit mode
+        title.textContent = 'Edit Stock';
+        btn.textContent = 'Update Stock';
+        state.currentInvestmentTicker = investment.ticker;
+
+        form.elements.ticker.value = investment.ticker;
+        form.elements.ticker.disabled = true; // Can't change ticker
+        form.elements.shares_owned.value = investment.shares_owned;
+        form.elements.manual_price_override.value = investment.manual_price_override || '';
+        form.elements.manual_rate_override.value = investment.manual_rate_override || '';
+    } else {
+        // Add mode
+        title.textContent = 'Add Stock';
+        btn.textContent = 'Add Stock';
+        state.currentInvestmentTicker = null;
+        form.reset();
+        form.elements.ticker.disabled = false;
+    }
+}
+
+function closeInvestmentModal() {
+    const modal = document.getElementById('investmentModal');
+    const form = document.getElementById('investmentForm');
+    modal.classList.remove('active');
+    form.reset();
+    form.elements.ticker.disabled = false;
+    state.currentInvestmentTicker = null;
+}
+
+// ===================================
+// FIXED DEPOSITS
+// ===================================
+
+async function loadFixedDeposits() {
+    try {
+        state.fixedDeposits = await API.getFixedDeposits();
+        renderFDList();
+    } catch (error) {
+        console.error('Error loading FDs:', error);
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast('Failed to load fixed deposits', 'error');
+        }
+    }
+}
+
+function renderFDList() {
+    const list = document.getElementById('fdList');
+    list.innerHTML = '';
+    
+    if (state.fixedDeposits.length === 0) {
+        list.innerHTML = UI.renderEmptyState('No fixed deposits yet', '🏦');
+        document.getElementById('fdSummary').style.display = 'none';
+        return;
+    }
+
+    let totalPrincipal = 0, totalCurrent = 0, totalMaturity = 0;
+    
+    state.fixedDeposits.forEach(fd => {
+        totalPrincipal += fd.principal;
+        totalCurrent += fd.currentValue;
+        totalMaturity += fd.maturityValue;
+        
+        const maturityDate = new Date(fd.maturityDate);
+        const isMatured = new Date() >= maturityDate;
+        
+        const item = document.createElement('div');
+        item.className = 'holding-item fd-item';
+        item.innerHTML = `
+            <div class="holding-icon">🏦</div>
+            <div class="holding-details">
+                <div class="holding-ticker">${fd.bankName}</div>
+                <div class="holding-shares">₹${fd.principal.toLocaleString('en-IN')} @ ${fd.rateOfInterest}%</div>
+                <div class="fd-dates">
+                    ${isMatured ? '<span class="matured-badge">Matured</span>' : `Matures: ${maturityDate.toLocaleDateString('en-IN')}`}
+                </div>
+                <div class="fd-current">Current: <span class="gold-text">₹${fd.currentValue.toLocaleString('en-IN', {maximumFractionDigits: 0})}</span></div>
+            </div>
+            <button class="btn-delete" data-id="${fd.id}">🗑️</button>
+        `;
+        
+        item.querySelector('.btn-delete').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (confirm('Delete this fixed deposit?')) {
+                try {
+                    await API.deleteFixedDeposit(fd.id);
+                    UI.showToast('Fixed deposit deleted', 'success');
+                    await loadFixedDeposits();
+                } catch (error) {
+                    console.error('Error deleting FD:', error);
+                    UI.showToast('Failed to delete fixed deposit', 'error');
+                }
+            }
+        });
+        
+        item.addEventListener('click', () => openFDModal(fd));
+        list.appendChild(item);
+    });
+    
+    document.getElementById('fdTotalPrincipal').textContent = UI.formatCurrency(totalPrincipal);
+    document.getElementById('fdCurrentValue').textContent = UI.formatCurrency(totalCurrent);
+    document.getElementById('fdMaturityValue').textContent = UI.formatCurrency(totalMaturity);
+    document.getElementById('fdSummary').style.display = 'block';
+}
+
+function openFDModal(fd = null) {
+    const modal = document.getElementById('fdModal');
+    const form = document.getElementById('fdForm');
+    const title = document.getElementById('fdModalTitle');
+    const btn = document.getElementById('saveFDBtn');
+    
+    modal.classList.add('active');
+    if (fd) {
+        title.textContent = 'Edit Fixed Deposit';
+        btn.textContent = 'Update';
+        state.currentFDId = fd.id;
+        form.elements.bankName.value = fd.bankName;
+        form.elements.principal.value = fd.principal;
+        form.elements.rateOfInterest.value = fd.rateOfInterest;
+        form.elements.startDate.value = fd.startDate;
+        form.elements.maturityDate.value = fd.maturityDate;
+        form.elements.note.value = fd.note || '';
+    } else {
+        title.textContent = 'Add Fixed Deposit';
+        btn.textContent = 'Add Fixed Deposit';
+        state.currentFDId = null;
+        form.reset();
+    }
+}
+
+function closeFDModal() {
+    document.getElementById('fdModal').classList.remove('active');
+    document.getElementById('fdForm').reset();
+    state.currentFDId = null;
+}
+
+async function handleSaveFD(event) {
+    event.preventDefault();
+    const form = event.target;
+    const data = {
+        bankName: form.elements.bankName.value,
+        principal: parseFloat(form.elements.principal.value),
+        rateOfInterest: parseFloat(form.elements.rateOfInterest.value),
+        startDate: form.elements.startDate.value,
+        maturityDate: form.elements.maturityDate.value,
+        note: form.elements.note.value
+    };
+    
+    try {
+        if (state.currentFDId) {
+            await API.updateFixedDeposit(state.currentFDId, data);
+            UI.showToast('Fixed deposit updated!', 'success');
+        } else {
+            await API.createFixedDeposit(data);
+            UI.showToast('Fixed deposit added!', 'success');
+        }
+        closeFDModal();
+        await loadFixedDeposits();
+    } catch (error) {
+        console.error('Error saving FD:', error);
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast(error.message, 'error');
+        }
+    }
+}
+
+// ===================================
+// PF (PROVIDENT FUND)
+// ===================================
+
+function generateFinancialYears() {
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1; // 1-12
+    
+    // Indian FY starts in April (month 4)
+    const startYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+    
+    const years = [];
+    for (let i = 0; i < 10; i++) {
+        const fy = `FY ${startYear - i}-${(startYear - i + 1).toString().slice(-2)}`;
+        years.push(fy);
+    }
+    return years;
+}
+
+async function loadPFData() {
+    try {
+        const data = await API.getPFEntries(state.pfFilters);
+        state.pfEntries = data.entries;
+        state.pfSummary = data.summary;
+        state.pfFinancialYears = data.financialYears;
+        
+        renderPFSummary();
+        renderPFEntries();
+        populatePFYearFilter();
+    } catch (error) {
+        console.error('Error loading PF data:', error);
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast('Failed to load PF data', 'error');
+        }
+    }
+}
+
+function renderPFSummary() {
+    if (!state.pfSummary) return;
+    
+    document.getElementById('pfGrandTotal').textContent = UI.formatCurrency(state.pfSummary.grandTotal);
+    document.getElementById('pfTotalDeposits').textContent = UI.formatCurrency(state.pfSummary.totalDeposits);
+    document.getElementById('pfTotalInterest').textContent = UI.formatCurrency(state.pfSummary.totalInterest);
+    
+    document.getElementById('pfSummary').style.display = state.pfEntries.length > 0 ? 'block' : 'none';
+}
+
+function renderPFEntries() {
+    const list = document.getElementById('pfEntriesList');
+    list.innerHTML = '';
+    
+    if (state.pfEntries.length === 0) {
+        list.innerHTML = UI.renderEmptyState('No PF entries yet', '🏦');
+        return;
+    }
+    
+    state.pfEntries.forEach(entry => {
+        const entryDate = new Date(entry.date);
+        const isDeposit = entry.type === 'deposit';
+        
+        const item = document.createElement('div');
+        item.className = `pf-entry-item ${entry.type}`;
+        item.innerHTML = `
+            <div class="pf-entry-icon">${isDeposit ? '💰' : '📈'}</div>
+            <div class="pf-entry-details">
+                <div class="pf-entry-type">${isDeposit ? 'Deposit' : 'Interest'}</div>
+                <div class="pf-entry-date">${entryDate.toLocaleDateString('en-IN')}</div>
+                ${entry.financialYear ? `<div class="pf-entry-fy">${entry.financialYear}</div>` : ''}
+                ${entry.note ? `<div class="pf-entry-note">${entry.note}</div>` : ''}
+            </div>
+            <div class="pf-entry-amount ${isDeposit ? 'deposit-amount' : 'interest-amount'}">
+                ${UI.formatCurrency(entry.amount)}
+            </div>
+            <button class="btn-delete" data-id="${entry.id}">🗑️</button>
+        `;
+        
+        item.querySelector('.btn-delete').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (confirm(`Delete this ${entry.type} entry?`)) {
+                try {
+                    await API.deletePFEntry(entry.id);
+                    UI.showToast('PF entry deleted', 'success');
+                    await loadPFData();
+                } catch (error) {
+                    console.error('Error deleting PF entry:', error);
+                    UI.showToast('Failed to delete entry', 'error');
+                }
+            }
+        });
+        
+        list.appendChild(item);
+    });
+}
+
+function populatePFYearFilter() {
+    const filter = document.getElementById('pfYearFilter');
+    const currentOptions = Array.from(filter.options).map(opt => opt.value);
+    
+    state.pfFinancialYears.forEach(year => {
+        if (!currentOptions.includes(year)) {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            filter.appendChild(option);
+        }
+    });
+}
+
+function openPFModal(type = 'deposit') {
+    const modal = document.getElementById('pfModal');
+    const form = document.getElementById('pfForm');
+    const title = document.getElementById('pfModalTitle');
+    const btn = document.getElementById('savePFBtn');
+    const fyGroup = document.getElementById('pfFYGroup');
+    const fySelect = document.getElementById('pfFinancialYear');
+    
+    // Set type
+    document.getElementById('pfType').value = type;
+    
+    // Update UI based on type
+    if (type === 'deposit') {
+        title.textContent = 'Add PF Deposit';
+        btn.textContent = 'Add Deposit';
+        fyGroup.style.display = 'none';
+        fySelect.removeAttribute('required');
+    } else {
+        title.textContent = 'Add Interest';
+        btn.textContent = 'Add Interest';
+        fyGroup.style.display = 'block';
+        fySelect.setAttribute('required', 'required');
+        
+        // Populate FY dropdown
+        fySelect.innerHTML = '<option value=\"\">Select Financial Year</option>';
+        const years = generateFinancialYears();
+        years.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            fySelect.appendChild(option);
+        });
+    }
+    
+    form.reset();
+    document.getElementById('pfType').value = type;
+    document.getElementById('pfDate').valueAsDate = new Date();
+    modal.classList.add('active');
+}
+
+function closePFModal() {
+    document.getElementById('pfModal').classList.remove('active');
+    document.getElementById('pfForm').reset();
+}
+
+async function handleSavePF(event) {
+    event.preventDefault();
+    const form = event.target;
+    const data = {
+        type: form.elements.type.value,
+        amount: parseFloat(form.elements.amount.value),
+        date: form.elements.date.value,
+        financialYear: form.elements.financialYear.value || null,
+        note: form.elements.note.value
+    };
+    
+    try {
+        await API.createPFEntry(data);
+        UI.showToast(`${data.type === 'deposit' ? 'Deposit' : 'Interest'} added!`, 'success');
+        closePFModal();
+        await loadPFData();
+    } catch (error) {
+        console.error('Error saving PF entry:', error);
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast(error.message, 'error');
         }
     }
 }
@@ -1254,6 +2055,33 @@ async function handleSaveAccount(event) {
     }
 }
 
+async function handleSaveInvestment(event) {
+    event.preventDefault();
+
+    const formData = new FormData(event.target);
+    const investmentData = {
+        ticker: formData.get('ticker').toUpperCase(),
+        shares_owned: parseFloat(formData.get('shares_owned')),
+        manual_price_override: formData.get('manual_price_override') ? parseFloat(formData.get('manual_price_override')) : null,
+        manual_rate_override: formData.get('manual_rate_override') ? parseFloat(formData.get('manual_rate_override')) : null
+    };
+
+    try {
+        await API.createInvestment(investmentData);
+        UI.showToast(state.currentInvestmentTicker ? 'Stock updated!' : 'Stock added!', 'success');
+
+        closeInvestmentModal();
+        await loadInvestmentsView();
+    } catch (error) {
+        console.error('Error saving investment:', error);
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast(error.message || 'Failed to save investment', 'error');
+        }
+    }
+}
+
 
 // ===================================
 // AUTH HANDLERS
@@ -1356,6 +2184,183 @@ function handleLogout() {
             usernameGreeting.style.display = 'none';
         }
         Auth.logout();
+    }
+}
+
+// ===================================
+// PIN AND PRIVILEGED MODE HANDLERS
+// ===================================
+async function handleInvestmentsAccess() {
+    try {
+        // Check if user has PIN set
+        const response = await API.hasPin();
+        state.hasPin = response.hasPin;
+
+        if (!state.hasPin) {
+            // Show PIN setup modal for first time
+            showPinSetupModal();
+        } else {
+            // Show PIN entry modal
+            showPinModal();
+        }
+    } catch (error) {
+        console.error('Error checking PIN status:', error);
+        if (error.message === 'Authentication required') {
+            handleAuthError(error);
+        } else {
+            UI.showToast('Failed to check PIN status', 'error');
+        }
+    }
+}
+
+function showPinSetupModal() {
+    const modal = document.getElementById('pinSetupModal');
+    const form = document.getElementById('pinSetupForm');
+    form.reset();
+    modal.classList.add('active');
+}
+
+function closePinSetupModal() {
+    const modal = document.getElementById('pinSetupModal');
+    modal.classList.remove('active');
+}
+
+function showPinModal() {
+    const modal = document.getElementById('pinModal');
+    const form = document.getElementById('pinForm');
+    form.reset();
+    modal.classList.add('active');
+}
+
+function closePinModal() {
+    const modal = document.getElementById('pinModal');
+    modal.classList.remove('active');
+}
+
+async function handlePinSetup(event) {
+    event.preventDefault();
+
+    const formData = new FormData(event.target);
+    const pin = formData.get('pin') || document.getElementById('setupPin').value;
+    const pinConfirm = formData.get('pinConfirm') || document.getElementById('setupPinConfirm').value;
+    const password = formData.get('password') || document.getElementById('setupPassword').value;
+
+    if (pin !== pinConfirm) {
+        UI.showToast('PINs do not match', 'error');
+        return;
+    }
+
+    if (!/^\d{4,6}$/.test(pin)) {
+        UI.showToast('PIN must be 4-6 digits', 'error');
+        return;
+    }
+
+    try {
+        await API.setPin(password, pin);
+        state.hasPin = true;
+        state.privilegedMode = true;
+        sessionStorage.setItem('privilegedMode', 'true');
+        
+        closePinSetupModal();
+        UI.showToast('PIN set successfully!', 'success');
+        UI.switchView('investments');
+    } catch (error) {
+        console.error('Error setting PIN:', error);
+        UI.showToast(error.message || 'Failed to set PIN', 'error');
+    }
+}
+
+async function handlePinEntry(event) {
+    event.preventDefault();
+
+    const formData = new FormData(event.target);
+    const pin = formData.get('pin') || document.getElementById('pinInput').value;
+
+    if (!/^\d{4,6}$/.test(pin)) {
+        UI.showToast('PIN must be 4-6 digits', 'error');
+        return;
+    }
+
+    try {
+        const response = await API.verifyPin(pin);
+        
+        if (response.valid) {
+            state.privilegedMode = true;
+            sessionStorage.setItem('privilegedMode', 'true');
+            
+            closePinModal();
+            UI.showToast('Access granted', 'success');
+            UI.switchView('investments');
+        } else {
+            UI.showToast('Invalid PIN', 'error');
+            document.getElementById('pinInput').value = '';
+        }
+    } catch (error) {
+        console.error('Error verifying PIN:', error);
+        UI.showToast(error.message || 'Failed to verify PIN', 'error');
+    }
+}
+
+// ===================================
+// SETTINGS VIEW
+// ===================================
+async function loadSettingsView() {
+    if (!state.currentUser) return;
+
+    // Update profile info
+    document.getElementById('settingsUsername').textContent = state.currentUser.username;
+    
+    const memberSince = new Date(state.currentUser.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    document.getElementById('settingsMemberSince').textContent = memberSince;
+
+    // Update PIN status info
+    try {
+        const response = await API.hasPin();
+        const pinInfo = document.getElementById('pinStatusInfo');
+        if (response.hasPin) {
+            pinInfo.textContent = 'Update your PIN to change your investments protection.';
+        } else {
+            pinInfo.textContent = 'Set a 4-6 digit PIN to protect your investments section.';
+        }
+    } catch (error) {
+        console.error('Error loading PIN status:', error);
+    }
+
+    // Reset form
+    document.getElementById('changePinForm').reset();
+}
+
+async function handleChangePinFunction(event) {
+    event.preventDefault();
+
+    const formData = new FormData(event.target);
+    const password = formData.get('password') || document.getElementById('currentPassword').value;
+    const newPin = formData.get('newPin') || document.getElementById('newPin').value;
+    const confirmPin = formData.get('confirmPin') || document.getElementById('confirmPin').value;
+
+    if (newPin !== confirmPin) {
+        UI.showToast('PINs do not match', 'error');
+        return;
+    }
+
+    if (!/^\d{4,6}$/.test(newPin)) {
+        UI.showToast('PIN must be 4-6 digits', 'error');
+        return;
+    }
+
+    try {
+        await API.setPin(password, newPin);
+        state.hasPin = true;
+        
+        UI.showToast('PIN updated successfully!', 'success');
+        event.target.reset();
+    } catch (error) {
+        console.error('Error updating PIN:', error);
+        UI.showToast(error.message || 'Failed to update PIN', 'error');
     }
 }
 
@@ -1511,8 +2516,18 @@ function populateMonthFilter() {
 function initEventListeners() {
     // Navigation
     document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            UI.switchView(btn.dataset.view);
+        btn.addEventListener('click', (e) => {
+            const view = btn.dataset.view;
+            
+            // Special handling for investments - check PIN first
+            if (view === 'investments' && !state.privilegedMode) {
+                e.preventDefault();
+                e.stopPropagation();
+                handleInvestmentsAccess();
+                return;
+            }
+            
+            UI.switchView(view);
         });
     });
 
@@ -1578,8 +2593,37 @@ function initEventListeners() {
     });
     document.getElementById('loginForm').addEventListener('submit', handleLogin);
     document.getElementById('registerForm').addEventListener('submit', handleRegister);
-    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    document.getElementById('logoutBtn') && document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    document.getElementById('logoutBtnSettings').addEventListener('click', handleLogout);
     document.getElementById('exportBtn').addEventListener('click', exportExpensesToCSV);
+
+    // Settings button
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => {
+            UI.switchView('settings');
+        });
+    }
+
+    // Back to analytics button
+    const backToAnalyticsBtn = document.getElementById('backToAnalytics');
+    if (backToAnalyticsBtn) {
+        backToAnalyticsBtn.addEventListener('click', () => {
+            loadAnalyticsView();
+        });
+    }
+
+    // PIN modals
+    document.getElementById('closePinSetupModal').addEventListener('click', closePinSetupModal);
+    document.querySelector('#pinSetupModal .modal-backdrop').addEventListener('click', closePinSetupModal);
+    document.getElementById('pinSetupForm').addEventListener('submit', handlePinSetup);
+
+    document.getElementById('closePinModal').addEventListener('click', closePinModal);
+    document.querySelector('#pinModal .modal-backdrop').addEventListener('click', closePinModal);
+    document.getElementById('pinForm').addEventListener('submit', handlePinEntry);
+
+    // Settings form
+    document.getElementById('changePinForm').addEventListener('submit', handleChangePinFunction);
 
     // Year selector for analytics
     document.getElementById('yearSelector').addEventListener('change', async () => {
@@ -1598,6 +2642,66 @@ function initEventListeners() {
             // Reload chart
             await loadYearlyChart();
         });
+    });
+
+    // Investment tabs
+    document.querySelectorAll('.investment-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const type = tab.dataset.investmentType;
+            state.investmentType = type;
+
+            // Update active tab
+            document.querySelectorAll('.investment-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Show/hide content
+            document.querySelectorAll('.investment-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${type}-content`).classList.add('active');
+            
+            // Load FDs when switching to mutual-funds (FD) tab
+            if (type === 'mutual-funds') {
+                loadFixedDeposits();
+            }
+            
+            // Load PF when switching to PF tab
+            if (type === 'pf') {
+                loadPFData();
+            }
+        });
+    });
+
+    // Investment buttons
+    document.getElementById('addStockBtn').addEventListener('click', () => openInvestmentModal());
+    document.getElementById('calculatePortfolioBtn').addEventListener('click', calculatePortfolio);
+
+    // Investment modal
+    document.getElementById('closeInvestmentModal').addEventListener('click', closeInvestmentModal);
+    document.querySelector('#investmentModal .modal-backdrop').addEventListener('click', closeInvestmentModal);
+    document.getElementById('investmentForm').addEventListener('submit', handleSaveInvestment);
+
+    // Fixed Deposit events
+    document.getElementById('addFDBtn').addEventListener('click', () => openFDModal());
+    document.getElementById('closeFDModal').addEventListener('click', closeFDModal);
+    document.querySelector('#fdModal .modal-backdrop').addEventListener('click', closeFDModal);
+    document.getElementById('fdForm').addEventListener('submit', handleSaveFD);
+
+    // PF events
+    document.getElementById('addPFDepositBtn').addEventListener('click', () => openPFModal('deposit'));
+    document.getElementById('addPFInterestBtn').addEventListener('click', () => openPFModal('interest'));
+    document.getElementById('closePFModal').addEventListener('click', closePFModal);
+    document.querySelector('#pfModal .modal-backdrop').addEventListener('click', closePFModal);
+    document.getElementById('pfForm').addEventListener('submit', handleSavePF);
+    
+    // PF filters
+    document.getElementById('pfTypeFilter').addEventListener('change', (e) => {
+        state.pfFilters.type = e.target.value;
+        loadPFData();
+    });
+    document.getElementById('pfYearFilter').addEventListener('change', (e) => {
+        state.pfFilters.financialYear = e.target.value;
+        loadPFData();
     });
 
     document.getElementById('date').valueAsDate = new Date();
@@ -1622,6 +2726,7 @@ async function initApp() {
     try {
         const fab = document.getElementById('addExpenseBtn');
         const logoutBtn = document.getElementById('logoutBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
         const usernameGreeting = document.getElementById('usernameGreeting');
 
         // Validate user data before proceeding
@@ -1629,8 +2734,11 @@ async function initApp() {
             throw new Error('Invalid user data');
         }
 
-        // Show logout button
-        if (logoutBtn) logoutBtn.style.display = 'block';
+        // Hide old logout button (now in settings)
+        if (logoutBtn) logoutBtn.style.display = 'none';
+
+        // Show settings button
+        if (settingsBtn) settingsBtn.style.display = 'block';
 
         // Show export button
         const exportBtn = document.getElementById('exportBtn');

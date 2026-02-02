@@ -129,6 +129,53 @@ class User {
       createdAt: user.createdAt
     };
   }
+
+  /**
+   * Set or update PIN for a user (with triple-write)
+   */
+  static async setPin(userId, pin) {
+    const { hash, salt } = await this.hashPassword(pin);
+    
+    // Update in main database
+    db.prepare('UPDATE users SET pinHash = ?, pinSalt = ? WHERE id = ?')
+      .run(hash, salt, userId);
+    
+    // Sync to backup databases
+    try {
+      if (backup1Db) {
+        backup1Db.prepare('UPDATE users SET pinHash = ?, pinSalt = ? WHERE id = ?')
+          .run(hash, salt, userId);
+      }
+      if (backup2Db) {
+        backup2Db.prepare('UPDATE users SET pinHash = ?, pinSalt = ? WHERE id = ?')
+          .run(hash, salt, userId);
+      }
+    } catch (error) {
+      console.error('Failed to sync PIN to backups:', error);
+      throw new Error('Failed to write to backup databases');
+    }
+
+    return true;
+  }
+
+  /**
+   * Verify PIN for a user
+   */
+  static async verifyPin(userId, pin) {
+    const user = db.prepare('SELECT pinHash, pinSalt FROM users WHERE id = ?').get(userId);
+    if (!user || !user.pinHash) {
+      return false;
+    }
+    return this.verifyPassword(pin, user.pinHash, user.pinSalt);
+  }
+
+  /**
+   * Check if user has a PIN set
+   */
+  static hasPin(userId) {
+    const user = db.prepare('SELECT pinHash FROM users WHERE id = ?').get(userId);
+    return !!(user && user.pinHash);
+  }
 }
 
 export default User;

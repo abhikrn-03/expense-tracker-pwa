@@ -30,9 +30,8 @@
       <h1 class="app-title">💰 Expenses</h1>
       <div class="header-right">
         <div class="username-greeting" id="usernameGreeting" style="display: none;"></div>
-        <div class="current-date" id="currentDate"></div>
+        <button class="settings-btn" id="settingsBtn" style="display: none;" title="Settings">⚙️</button>
         <button class="export-btn" id="exportBtn" style="display: none;" title="Export to CSV">📥</button>
-        <button class="logout-btn" id="logoutBtn" style="display: none;">Logout</button>
       </div>
     </header>
 
@@ -49,6 +48,10 @@
       <button class="nav-btn" data-view="analytics">
         <span class="nav-icon">📊</span>
         <span class="nav-label">Analytics</span>
+      </button>
+      <button class="nav-btn" data-view="investments">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label">Investments</span>
       </button>
     </nav>
 
@@ -121,6 +124,197 @@
         <div class="chart-section">
           <h2 class="section-title">Category Breakdown</h2>
           <div id="categoryChart" class="category-chart"></div>
+        </div>
+
+        <!-- Category Details Section -->
+        <div class="category-details-section" id="categoryDetailsSection" style="display: none;">
+          <div class="section-header">
+            <button class="btn-back" id="backToAnalytics">← Back</button>
+            <h2 class="section-title" id="categoryDetailsTitle">Category Transactions</h2>
+          </div>
+          <div id="categoryTransactionsList" class="transaction-list"></div>
+        </div>
+      </section>
+
+      <!-- Investments View -->
+      <section id="investments-view" class="view">
+        <!-- Investment Category Tabs -->
+        <div class="investment-tabs">
+          <button class="investment-tab active" data-investment-type="nasdaq">Nasdaq</button>
+          <button class="investment-tab" data-investment-type="mutual-funds">Fixed Deposits</button>
+          <button class="investment-tab" data-investment-type="pf">PF</button>
+          <button class="investment-tab" data-investment-type="crypto">Crypto</button>
+        </div>
+
+        <!-- Nasdaq Tab Content -->
+        <div class="investment-tab-content active" id="nasdaq-content">
+          <div class="section-header">
+            <h2 class="section-title">Stock Holdings</h2>
+            <button class="btn-secondary" id="addStockBtn">+ Add Stock</button>
+          </div>
+
+          <div id="stockHoldingsList" class="holdings-list">
+            <!-- Holdings populated by JS -->
+          </div>
+
+          <button class="btn-primary calculate-btn" id="calculatePortfolioBtn">
+            <span>💰</span> Calculate Portfolio Value
+          </button>
+
+          <!-- Results Card -->
+          <div id="portfolioResults" class="investment-results" style="display: none;">
+            <div class="results-card gold-card">
+              <div class="results-header">
+                <h3>Portfolio Value</h3>
+                <div class="results-timestamp" id="resultsTimestamp"></div>
+              </div>
+              
+              <div class="total-value">
+                <div class="total-label">Total Value (INR)</div>
+                <div class="total-amount" id="totalValueINR">₹0</div>
+              </div>
+
+              <div class="exchange-rate">
+                <span>Exchange Rate:</span>
+                <span id="exchangeRateDisplay">-</span>
+              </div>
+
+              <div class="holdings-breakdown" id="holdingsBreakdown">
+                <!-- Individual stock values populated by JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fixed Deposits Tab Content -->
+        <div class="investment-tab-content" id="mutual-funds-content">
+          <div class="section-header">
+            <h2 class="section-title">Fixed Deposits</h2>
+            <button class="btn-secondary" id="addFDBtn">+ Add FD</button>
+          </div>
+
+          <div id="fdList" class="holdings-list">
+            <!-- FDs populated by JS -->
+          </div>
+
+          <div id="fdSummary" class="fd-summary" style="display: none;">
+            <div class="fd-summary-card gold-card">
+              <div class="fd-summary-row">
+                <span>Total Principal</span>
+                <span id="fdTotalPrincipal">₹0</span>
+              </div>
+              <div class="fd-summary-row">
+                <span>Current Value (Pro-rata)</span>
+                <span id="fdCurrentValue" class="gold-text">₹0</span>
+              </div>
+              <div class="fd-summary-row">
+                <span>Maturity Value</span>
+                <span id="fdMaturityValue">₹0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PF (Provident Fund) Tab Content -->
+        <div class="investment-tab-content" id="pf-content">
+          <div class="section-header">
+            <h2 class="section-title">Provident Fund</h2>
+            <div class="pf-actions">
+              <button class="btn-secondary" id="addPFDepositBtn">💰 Add Deposit</button>
+              <button class="btn-secondary" id="addPFInterestBtn">📈 Add Interest</button>
+            </div>
+          </div>
+
+          <!-- PF Summary -->
+          <div id="pfSummary" class="pf-summary" style="display: none;">
+            <div class="pf-summary-card gold-card">
+              <div class="pf-summary-header">
+                <h3>Total PF Balance</h3>
+                <div class="pf-total" id="pfGrandTotal">₹0</div>
+              </div>
+              <div class="pf-breakdown">
+                <div class="pf-breakdown-item deposits">
+                  <span class="pf-breakdown-label">💰 Total Deposits</span>
+                  <span class="pf-breakdown-value" id="pfTotalDeposits">₹0</span>
+                </div>
+                <div class="pf-breakdown-item interest">
+                  <span class="pf-breakdown-label">📈 Total Interest</span>
+                  <span class="pf-breakdown-value" id="pfTotalInterest">₹0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filter Bar -->
+          <div class="pf-filters">
+            <select id="pfTypeFilter" class="filter-select">
+              <option value="">All Types</option>
+              <option value="deposit">Deposits</option>
+              <option value="interest">Interest</option>
+            </select>
+            <select id="pfYearFilter" class="filter-select">
+              <option value="">All Years</option>
+            </select>
+          </div>
+
+          <!-- PF Entries List -->
+          <div id="pfEntriesList" class="pf-entries-list">
+            <!-- Entries populated by JS -->
+          </div>
+        </div>
+
+        <!-- Crypto Tab Content -->
+        <div class="investment-tab-content" id="crypto-content">
+          <div class="coming-soon">
+            <div class="coming-soon-icon">🏗️</div>
+            <h3>Coming Soon</h3>
+            <p>Cryptocurrency tracking will be available soon</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings View -->
+      <section id="settings-view" class="view">
+        <div class="settings-container">
+          <div class="settings-section">
+            <h2 class="section-title">Profile</h2>
+            <div class="profile-info">
+              <div class="profile-item">
+                <span class="profile-label">Username</span>
+                <span class="profile-value" id="settingsUsername"></span>
+              </div>
+              <div class="profile-item">
+                <span class="profile-label">Member Since</span>
+                <span class="profile-value" id="settingsMemberSince"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h2 class="section-title">Security</h2>
+            <div class="security-info">
+              <p class="pin-info" id="pinStatusInfo">Set a 4-6 digit PIN to protect your investments section.</p>
+              <form id="changePinForm" class="settings-form">
+                <div class="form-group">
+                  <label for="currentPassword">Current Password</label>
+                  <input type="password" id="currentPassword" name="password" required>
+                </div>
+                <div class="form-group">
+                  <label for="newPin">New PIN (4-6 digits)</label>
+                  <input type="password" id="newPin" name="newPin" pattern="[0-9]{4,6}" inputmode="numeric" maxlength="6" required>
+                </div>
+                <div class="form-group">
+                  <label for="confirmPin">Confirm PIN</label>
+                  <input type="password" id="confirmPin" name="confirmPin" pattern="[0-9]{4,6}" inputmode="numeric" maxlength="6" required>
+                </div>
+                <button type="submit" class="btn-primary">Update PIN</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <button class="btn-danger" id="logoutBtnSettings">Logout</button>
+          </div>
         </div>
       </section>
 
@@ -347,8 +541,184 @@
     </div>
   </div>
 
+  <!-- Modal for Adding Stock Investment -->
+  <div id="investmentModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="investmentModalTitle">Add Stock</h2>
+        <button class="modal-close" id="closeInvestmentModal">&times;</button>
+      </div>
+
+      <form id="investmentForm" class="expense-form">
+        <div class="form-group">
+          <label for="stockTicker">Ticker Symbol</label>
+          <input type="text" id="stockTicker" name="ticker" required placeholder="E.g., MSFT" style="text-transform: uppercase;" autofocus>
+          <small style="color: #888; font-size: 12px;">Nasdaq stock symbol</small>
+        </div>
+
+        <div class="form-group">
+          <label for="sharesOwned">Shares Owned</label>
+          <input type="number" id="sharesOwned" name="shares_owned" step="0.0001" required placeholder="E.g., 10">
+        </div>
+
+        <div class="form-group">
+          <label for="manualPrice">Manual Price Override (USD) - Optional</label>
+          <input type="number" id="manualPrice" name="manual_price_override" step="0.01" placeholder="Leave empty to fetch live price">
+          <small style="color: #888; font-size: 12px;">Set a custom price instead of fetching from API</small>
+        </div>
+
+        <div class="form-group">
+          <label for="manualRate">Manual USD/INR Rate - Optional</label>
+          <input type="number" id="manualRate" name="manual_rate_override" step="0.01" placeholder="Leave empty to fetch live rate">
+          <small style="color: #888; font-size: 12px;">Set a custom exchange rate</small>
+        </div>
+
+        <button type="submit" class="btn-primary" id="saveInvestmentBtn">Add Stock</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal for Adding Fixed Deposit -->
+  <div id="fdModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="fdModalTitle">Add Fixed Deposit</h2>
+        <button class="modal-close" id="closeFDModal">&times;</button>
+      </div>
+
+      <form id="fdForm" class="expense-form">
+        <div class="form-group">
+          <label for="fdBankName">Bank Name</label>
+          <input type="text" id="fdBankName" name="bankName" required placeholder="E.g., HDFC Bank" autofocus>
+        </div>
+
+        <div class="form-group">
+          <label for="fdPrincipal">Principal Amount (₹)</label>
+          <input type="number" id="fdPrincipal" name="principal" step="0.01" required placeholder="E.g., 100000">
+        </div>
+
+        <div class="form-group">
+          <label for="fdRate">Rate of Interest (% per annum)</label>
+          <input type="number" id="fdRate" name="rateOfInterest" step="0.01" required placeholder="E.g., 7.5">
+        </div>
+
+        <div class="form-group">
+          <label for="fdStartDate">Start Date</label>
+          <input type="date" id="fdStartDate" name="startDate" required>
+        </div>
+
+        <div class="form-group">
+          <label for="fdMaturityDate">Maturity Date</label>
+          <input type="date" id="fdMaturityDate" name="maturityDate" required>
+        </div>
+
+        <div class="form-group">
+          <label for="fdNote">Note (optional)</label>
+          <input type="text" id="fdNote" name="note" placeholder="E.g., Tax saver FD">
+        </div>
+
+        <button type="submit" class="btn-primary" id="saveFDBtn">Add Fixed Deposit</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal for Adding PF Entry -->
+  <div id="pfModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="pfModalTitle">Add PF Deposit</h2>
+        <button class="modal-close" id="closePFModal">&times;</button>
+      </div>
+
+      <form id="pfForm" class="expense-form">
+        <input type="hidden" id="pfType" name="type" value="deposit">
+
+        <div class="form-group">
+          <label for="pfAmount">Amount (₹)</label>
+          <input type="number" id="pfAmount" name="amount" step="0.01" required placeholder="E.g., 5000" autofocus>
+        </div>
+
+        <div class="form-group">
+          <label for="pfDate">Date</label>
+          <input type="date" id="pfDate" name="date" required>
+        </div>
+
+        <div class="form-group" id="pfFYGroup" style="display: none;">
+          <label for="pfFinancialYear">Financial Year</label>
+          <select id="pfFinancialYear" name="financialYear" class="filter-select">
+            <!-- Options populated by JS -->
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="pfNote">Note (optional)</label>
+          <input type="text" id="pfNote" name="note" placeholder="E.g., Monthly contribution">
+        </div>
+
+        <button type="submit" class="btn-primary" id="savePFBtn">Add Entry</button>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toast" class="toast"></div>
+
+  <!-- PIN Setup Modal (First Time) -->
+  <div id="pinSetupModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Set Up PIN</h2>
+        <button class="modal-close" id="closePinSetupModal">&times;</button>
+      </div>
+
+      <p class="modal-description">Create a 4-6 digit PIN to protect your investments section.</p>
+
+      <form id="pinSetupForm" class="expense-form">
+        <div class="form-group">
+          <label for="setupPin">New PIN (4-6 digits)</label>
+          <input type="password" id="setupPin" name="pin" pattern="[0-9]{4,6}" inputmode="numeric" maxlength="6" required autofocus>
+        </div>
+
+        <div class="form-group">
+          <label for="setupPinConfirm">Confirm PIN</label>
+          <input type="password" id="setupPinConfirm" name="pinConfirm" pattern="[0-9]{4,6}" inputmode="numeric" maxlength="6" required>
+        </div>
+
+        <div class="form-group">
+          <label for="setupPassword">Your Password (to verify)</label>
+          <input type="password" id="setupPassword" name="password" required>
+        </div>
+
+        <button type="submit" class="btn-primary">Set PIN</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- PIN Entry Modal -->
+  <div id="pinModal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Enter PIN</h2>
+        <button class="modal-close" id="closePinModal">&times;</button>
+      </div>
+
+      <p class="modal-description">Enter your PIN to access investments.</p>
+
+      <form id="pinForm" class="expense-form">
+        <div class="form-group">
+          <label for="pinInput">PIN</label>
+          <input type="password" id="pinInput" name="pin" pattern="[0-9]{4,6}" inputmode="numeric" maxlength="6" required autofocus>
+        </div>
+
+        <button type="submit" class="btn-primary">Unlock</button>
+      </form>
+    </div>
+  </div>
 
   <!-- Auth Modal (Login/Register) -->
   <div id="authModal" class="modal">

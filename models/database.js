@@ -189,6 +189,56 @@ const initDB = () => {
     )
   `);
 
+  // Investments table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS investments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      ticker TEXT NOT NULL,
+      shares_owned REAL NOT NULL,
+      manual_price_override REAL,
+      manual_rate_override REAL,
+      timestamp INTEGER NOT NULL,
+      UNIQUE(userId, ticker),
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Fixed Deposits table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS fixed_deposits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      bankName TEXT NOT NULL,
+      principal REAL NOT NULL,
+      rateOfInterest REAL NOT NULL,
+      startDate TEXT NOT NULL,
+      maturityDate TEXT NOT NULL,
+      note TEXT,
+      timestamp INTEGER NOT NULL,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // PF Entries table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pf_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('deposit', 'interest')),
+      amount REAL NOT NULL,
+      date TEXT NOT NULL,
+      financialYear TEXT,
+      note TEXT,
+      timestamp INTEGER NOT NULL,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_pf_entries_user_type ON pf_entries(userId, type)
+  `);
+
   // Migration: Add whereSpent column if it doesn't exist
   try {
     // Migrate main database
@@ -207,6 +257,17 @@ const initDB = () => {
       // Default to user ID 1 for existing data
       db.prepare('ALTER TABLE expenses ADD COLUMN userId INTEGER NOT NULL DEFAULT 1').run();
       console.log('✅ Main database migration completed (userId)');
+    }
+
+    // Migration: Add PIN columns to users table
+    const userInfo = db.prepare("PRAGMA table_info(users)").all();
+    const hasPinHash = userInfo.some(col => col.name === 'pinHash');
+    
+    if (!hasPinHash) {
+      console.log('📦 Migrating main database: Adding PIN columns to users...');
+      db.prepare('ALTER TABLE users ADD COLUMN pinHash TEXT').run();
+      db.prepare('ALTER TABLE users ADD COLUMN pinSalt TEXT').run();
+      console.log('✅ Main database migration completed (PIN columns)');
     }
 
     const hasAccountId = tableInfo.some(col => col.name === 'accountId');
@@ -237,6 +298,19 @@ const initDB = () => {
           console.log('✅ Backup1 migration completed (userId)');
         }
       }
+
+      // Migrate users table for PIN columns in backup1
+      const usersTableExists = backup1Db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").get();
+      if (usersTableExists) {
+        const backup1UserInfo = backup1Db.prepare("PRAGMA table_info(users)").all();
+        const backup1HasPinHash = backup1UserInfo.some(col => col.name === 'pinHash');
+        if (!backup1HasPinHash) {
+          console.log('📦 Migrating backup1 database: Adding PIN columns to users...');
+          backup1Db.prepare('ALTER TABLE users ADD COLUMN pinHash TEXT').run();
+          backup1Db.prepare('ALTER TABLE users ADD COLUMN pinSalt TEXT').run();
+          console.log('✅ Backup1 migration completed (PIN columns)');
+        }
+      }
     }
 
     if (backup2Db) {
@@ -257,6 +331,19 @@ const initDB = () => {
           console.log('📦 Migrating backup2 database: Adding userId column...');
           backup2Db.prepare('ALTER TABLE expenses ADD COLUMN userId INTEGER NOT NULL DEFAULT 1').run();
           console.log('✅ Backup2 migration completed (userId)');
+        }
+      }
+
+      // Migrate users table for PIN columns in backup2
+      const usersTableExists = backup2Db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").get();
+      if (usersTableExists) {
+        const backup2UserInfo = backup2Db.prepare("PRAGMA table_info(users)").all();
+        const backup2HasPinHash = backup2UserInfo.some(col => col.name === 'pinHash');
+        if (!backup2HasPinHash) {
+          console.log('📦 Migrating backup2 database: Adding PIN columns to users...');
+          backup2Db.prepare('ALTER TABLE users ADD COLUMN pinHash TEXT').run();
+          backup2Db.prepare('ALTER TABLE users ADD COLUMN pinSalt TEXT').run();
+          console.log('✅ Backup2 migration completed (PIN columns)');
         }
       }
     }
